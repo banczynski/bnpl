@@ -1,28 +1,27 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.Kyc;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
     public sealed class CreateKycUseCase(
-        IKycRepository repository,
+        IKycRepository kycRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(CreateKycRequest request)
+        public async Task<Result<KycDto, string>> ExecuteAsync(Guid customerId, CreateKycRequest request)
         {
-            var existing = await repository.GetByCustomerIdAsync(request.CustomerId);
+            var existing = await kycRepository.GetByCustomerIdAsync(customerId);
             if (existing is not null)
-                throw new InvalidOperationException("KYC already exists for this customer.");
+                return Result<KycDto, string>.Fail("KYC already exists for this customer.");
 
-            var now = DateTime.UtcNow;
+            var entity = request.ToEntity(customerId, userContext.GetRequiredUserId());
+            await kycRepository.InsertAsync(entity);
 
-            var entity = request.ToEntity(now, userContext.UserId);
-            await repository.InsertAsync(entity);
-
-            return new ServiceResult<string>("KYC data saved.");
+            return Result<KycDto, string>.Ok(entity.ToDto());
         }
     }
 }

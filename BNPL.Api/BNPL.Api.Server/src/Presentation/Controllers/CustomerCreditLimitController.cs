@@ -1,28 +1,22 @@
-﻿using BNPL.Api.Server.src.Application.UseCases.CreditLimit;
+﻿using BNPL.Api.Server.src.Application.DTOs.CreditLimit;
+using BNPL.Api.Server.src.Application.UseCases.CreditLimit;
 using Core.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BNPL.Api.Server.src.Presentation.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public sealed class CustomerCreditLimitController(
-        GetCustomerCreditLimitUseCase getUseCase,
-        AdjustCustomerCreditLimitUseCase adjustUseCase
+        GetCustomerCreditLimitUseCase getUseCase
     ) : ControllerBase
     {
-        [HttpGet("{taxIdd}")]
-        public async Task<ActionResult<ServiceResult<object>>> Get(string taxIdd)
-            => Ok(await getUseCase.ExecuteAsync(taxIdd));
-
-        [HttpPost("{taxId}/adjust")]
-        public async Task<ActionResult<ServiceResult<string>>> Adjust(
+        [HttpGet("{taxId}")]
+        public async Task<ActionResult<Result<CustomerCreditLimitDto, string>>> Get(
             string taxId,
-            [FromQuery] decimal value,
-            [FromQuery] bool increase = false
-        )
-        {
-            return Ok(await adjustUseCase.ExecuteAsync(taxId, value, increase));
-        }
+            [FromQuery] Guid affiliateId)
+            => Ok(await getUseCase.ExecuteAsync(taxId, affiliateId));
     }
 }

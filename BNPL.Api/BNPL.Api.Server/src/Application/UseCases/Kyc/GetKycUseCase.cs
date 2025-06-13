@@ -1,18 +1,20 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Kyc;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Kyc;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
-    public sealed class GetKycUseCase(IKycRepository repository)
+    public sealed class GetKycUseCase(IKycRepository kycRepository)
     {
-        public async Task<ServiceResult<KycDto>> ExecuteAsync(Guid customerId)
+        public async Task<Result<KycDto, string>> ExecuteAsync(Guid customerId)
         {
-            var entity = await repository.GetByCustomerIdAsync(customerId)
-                ?? throw new InvalidOperationException("KYC data not found.");
+            var entity = await kycRepository.GetByCustomerIdAsync(customerId);
 
-            return new ServiceResult<KycDto>(entity.ToDto());
+            if (entity is null)
+                return Result<KycDto, string>.Fail("KYC data not found.");
+
+            return Result<KycDto, string>.Ok(entity.ToDto());
         }
     }
 }

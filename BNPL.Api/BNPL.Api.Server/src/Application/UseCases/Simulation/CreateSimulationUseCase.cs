@@ -1,55 +1,87 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Business;
+using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
-using BNPL.Api.Server.src.Application.DTOs.CreditLimit;
 using BNPL.Api.Server.src.Application.DTOs.Simulation;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services.External;
-using BNPL.Api.Server.src.Application.UseCases.CreditLimit;
+using BNPL.Api.Server.src.Application.UseCases.CreditAnalysis;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Simulation
 {
     public sealed class CreateSimulationUseCase(
-        ISimulationRepository repository,
-        ICreditAnalysisService creditAnalysisService,
-        UpsertCustomerCreditLimitUseCase creditLimitUseCase,
+        ISimulationRepository simulationRepository,
+        IAffiliateRepository affiliateRepository,
+        EvaluateCustomerCreditUseCase evaluateCustomerCreditUseCase,
+        IInstallmentCalculator installmentCalculator,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<SimulationResponse>> ExecuteAsync(CreateSimulationRequest request)
+        public async Task<Result<SimulationWithInstallmentsResponse, string>> ExecuteAsync(Guid affiliateId, CreateSimulationRequest request)
         {
-            var now = DateTime.UtcNow;
-            var id = Guid.NewGuid();
+            using var scope = unitOfWork;
 
-            // TODO
-            var decision = await creditAnalysisService.AnalyzeAsync(request.PartnerId, request.AffiliateId, request.CustomerTaxId, request.RequestedAmount);
+            try
+            {
+                scope.Begin();
 
-            if ((decision.Decision != Domain.Enums.CreditAnalysisStatus.Approved) || decision.ApprovedAmount <= 0)
-                throw new InvalidOperationException("Credit denied.");
+                var partnerId = await affiliateRepository.GetPartnerIdByAffiliateIdAsync(affiliateId);
+                if (partnerId.GetValueOrDefault() == Guid.Empty)
+                    return Result<SimulationWithInstallmentsResponse, string>.Fail("Affiliate not found.");
 
-            await creditLimitUseCase.ExecuteAsync(new CreditLimitUpsertRequest(
-                PartnerId: request.PartnerId,
-                AffiliateId: request.AffiliateId,
-                CustomerTaxId: request.CustomerTaxId,
-                ApprovedLimit: decision.ApprovedAmount
-            ));
+                var result = await evaluateCustomerCreditUseCase.ExecuteAsync(partnerId.Value, affiliateId, request.CustomerTaxId, scope.Transaction);
 
-            var entity = request.ToEntity(
-                approvedAmount: decision.ApprovedAmount,
-                maxInstallments: decision.MaxInstallments,
-                interestRate: decision.MonthlyInterestRate,
-                id: id,
-                now: now,
-                user: userContext.UserId
-            );
+                if (result is Result<CreditAnalysisResult, string>.Failure fail)
+                    return Result<SimulationWithInstallmentsResponse, string>.Fail(fail.Error);
 
-            await repository.InsertAsync(entity);
+                if (result is not Result<CreditAnalysisResult, string>.Success success)
+                    return Result<SimulationWithInstallmentsResponse, string>.Fail("Unexpected result state");
 
-            return new ServiceResult<SimulationResponse>(
-                entity.ToResponse(),
-                ["Simulation completed successfully."]
-            );
+                var decision = success.Value;
+
+                if (request.RequestedAmount > decision.ApprovedLimit)
+                    return Result<SimulationWithInstallmentsResponse, string>.Fail("Requested amount exceeds approved credit limit.");
+
+                var entity = request.ToEntity(
+                    partnerId: partnerId.Value,
+                    affiliateId: affiliateId,
+                    approvedAmount: decision.ApprovedLimit,
+                    maxInstallments: decision.MaxInstallments,
+                    interestRate: decision.MonthlyInterestRate,
+                    user: userContext.GetRequiredUserId()
+                );
+
+                await simulationRepository.InsertAsync(entity);
+
+                var installmentOptions = installmentCalculator.Calculate(
+                    amount: request.RequestedAmount,
+                    maxInstallments: decision.MaxInstallments,
+                    monthlyInterestRate: decision.MonthlyInterestRate
+                );
+
+                var affordableOptions = installmentOptions
+                    .Where(o => o.Total <= decision.ApprovedLimit)
+                    .ToList();
+
+                if (affordableOptions.Count == 0)
+                    return Result<SimulationWithInstallmentsResponse, string>.Fail("No installment option fits the approved credit limit.");
+
+                scope.Commit();
+
+                return Result<SimulationWithInstallmentsResponse, string>.Ok(new SimulationWithInstallmentsResponse
+                {
+                    Simulation = entity.ToResponse(),
+                    Installments = affordableOptions
+                });
+            }
+            catch
+            {
+                scope.Rollback();
+                throw;
+            }
         }
     }
 }

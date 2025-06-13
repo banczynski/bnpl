@@ -1,5 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Infrastructure.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Infrastructure.Persistence.Repositories;
 
 namespace BNPL.Api.Server.src.Presentation.Configurations
 {
@@ -19,8 +19,8 @@ namespace BNPL.Api.Server.src.Presentation.Configurations
             services.AddScoped<IProposalItemRepository, ProposalItemRepository>();
             services.AddScoped<IProposalRepository, ProposalRepository>();
             services.AddScoped<IProposalSignatureRepository, ProposalSignatureRepository>();
-            services.AddScoped<IRenegotiationRepository, RenegotiationRepository>();
             services.AddScoped<ISimulationRepository, SimulationRepository>();
+            services.AddScoped<ICustomerBillingPreferencesRepository, CustomerBillingPreferencesRepository>();
             return services;
         }
     }

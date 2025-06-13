@@ -1,5 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Contract;
-using BNPL.Api.Server.src.Application.Services.External;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Storage;
+using BNPL.Api.Server.src.Application.DTOs.Contract;
 
 namespace BNPL.Api.Server.src.Infrastructure.Services.External
 {

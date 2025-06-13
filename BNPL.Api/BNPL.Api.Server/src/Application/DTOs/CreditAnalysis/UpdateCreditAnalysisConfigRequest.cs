@@ -3,6 +3,9 @@
     public sealed record UpdateCreditAnalysisConfigRequest(
         decimal MinApprovedPercentage,
         decimal MaxApprovedPercentage,
-        decimal RejectionThreshold
+        decimal RejectionThreshold,
+        decimal MaxCreditAmount,
+        int MaxInstallments,
+        decimal MonthlyInterestRate
     );
 }

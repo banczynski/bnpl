@@ -5,35 +5,37 @@ namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class ProposalItemMapper
     {
-        public static ProposalItem ToEntity(this CreateProposalItemRequest request, Guid proposalId, DateTime now, string user)
+        public static ProposalItem ToEntity(this CreateProposalItemRequest request, Guid proposalId, Guid affiliateId, Guid user)
             => new()
             {
-                Id = Guid.NewGuid(),
+                Code = Guid.NewGuid(),
                 ProposalId = proposalId,
-                ProductId = request.ProductId,
                 Description = request.Description,
                 Amount = request.Amount,
-                AffiliateId = request.AffiliateId,
+                AffiliateId = affiliateId,
                 Returned = false,
                 ReturnReason = null,
                 ReturnedAt = null,
-                CreatedAt = now,
-                UpdatedAt = now,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user,
                 IsActive = true
             };
 
-        public static ProposalItemDto ToDto(this ProposalItem item)
+        public static ProposalItemDto ToDto(this ProposalItem pi)
             => new(
-                item.ProposalId,
-                item.ProductId,
-                item.Description,
-                item.Amount,
-                item.AffiliateId,
-                item.Returned,
-                item.ReturnReason,
-                item.ReturnedAt
+                pi.Code,
+                pi.ProposalId,
+                pi.Description,
+                pi.Amount,
+                pi.AffiliateId,
+                pi.Returned,
+                pi.ReturnReason,
+                pi.ReturnedAt
             );
+
+        public static IEnumerable<ProposalItemDto> ToDtoList(this IEnumerable<ProposalItem> items)
+            => [.. items.Select(pi => pi.ToDto())];
     }
 }

@@ -1,28 +1,32 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using Core.Context.Interfaces;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using System.Data;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
 {
     public sealed class AdjustCustomerCreditLimitUseCase(
-        ICustomerCreditLimitRepository repository,
+        ICustomerCreditLimitRepository customerCreditLimitRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(string taxId, decimal value, bool increase)
+        public async Task<Result<bool, string>> ExecuteAsync(string taxId, Guid affiliateId, decimal value, bool increase, IDbTransaction? transaction = null)
         {
-            var entity = await repository.GetByTaxIdAsync(taxId)
-                ?? throw new InvalidOperationException("Customer credit limit not found.");
+            var entity = await customerCreditLimitRepository.GetByTaxIdAndAffiliateIdAsync(taxId, affiliateId, transaction);
+
+            if (entity is null)
+                return Result<bool, string>.Fail("Customer credit limit not found.");
 
             var now = DateTime.UtcNow;
             if (increase)
-                entity.DecreaseUsedLimit(value, now, userContext.UserId);
+                entity.DecreaseUsedLimit(value, now, userContext.GetRequiredUserId());
             else
-                entity.IncreaseUsedLimit(value, now, userContext.UserId); 
+                entity.IncreaseUsedLimit(value, now, userContext.GetRequiredUserId());
 
-            await repository.UpdateAsync(entity);
+            await customerCreditLimitRepository.UpdateAsync(entity, transaction);
 
-            return new ServiceResult<string>("Customer credit limit adjusted.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

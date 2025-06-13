@@ -1,6 +1,7 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Proposal
@@ -11,24 +12,23 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid proposalId)
         {
-            var proposal = await proposalRepository.GetByIdAsync(proposalId)
-                ?? throw new InvalidOperationException("Proposal not found.");
+            var proposal = await proposalRepository.GetByIdAsync(proposalId);
+            if (proposal is null)
+                return Result<bool, string>.Fail("Proposal not found.");
 
-            if (proposal.Status != ProposalStatus.Disbursed)
-                throw new InvalidOperationException("Proposal must be disbursed before finalization.");
+            if (proposal.Status != ProposalStatus.Active)
+                return Result<bool, string>.Fail("Proposal must be active before finalization.");
 
             var installments = await installmentRepository.GetByProposalIdAsync(proposalId);
-
             if (installments.Any(i => i.Status != InstallmentStatus.Paid))
-                throw new InvalidOperationException("Proposal still has unpaid installments.");
+                return Result<bool, string>.Fail("Proposal still has unpaid installments.");
 
-            proposal.MarkAsFinalized(DateTime.UtcNow, userContext.UserId);
-
+            proposal.MarkAsFinalized(DateTime.UtcNow, userContext.GetRequiredUserId());
             await proposalRepository.UpdateAsync(proposal);
 
-            return new ServiceResult<string>("Proposal marked as finalized.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

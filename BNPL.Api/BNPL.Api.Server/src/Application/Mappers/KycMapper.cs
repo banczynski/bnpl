@@ -5,10 +5,11 @@ namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class KycMapper
     {
-        public static Kyc ToEntity(this CreateKycRequest request, DateTime now, string user)
+        public static Kyc ToEntity(this CreateKycRequest request, Guid customerId, Guid user)
             => new()
             {
-                CustomerId = request.CustomerId,
+                Code = Guid.NewGuid(),
+                CustomerId = customerId,
                 DocumentType = request.DocumentType,
                 DocumentNumber = request.DocumentNumber,
                 DocumentImageUrl = request.DocumentImageUrl,
@@ -16,13 +17,13 @@ namespace BNPL.Api.Server.src.Application.Mappers
                 OcrValidated = false,
                 FaceMatchValidated = false,
                 Status = Domain.Enums.KycStatus.Pending,
-                CreatedAt = now,
-                UpdatedAt = now,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user
             };
 
-        public static void UpdateEntity(this Kyc entity, UpdateKycRequest request, DateTime now, string user)
+        public static void UpdateEntity(this Kyc entity, UpdateKycRequest request, DateTime now, Guid user)
         {
             if (request.DocumentType.HasValue)
                 entity.DocumentType = request.DocumentType;
@@ -46,20 +47,21 @@ namespace BNPL.Api.Server.src.Application.Mappers
             entity.UpdatedBy = user;
         }
 
-        public static KycDto ToDto(this Kyc entity)
+        public static KycDto ToDto(this Kyc k)
             => new(
-                entity.CustomerId,
-                entity.DocumentType,
-                entity.DocumentNumber,
-                entity.DocumentImageUrl,
-                entity.SelfieImageUrl,
-                entity.OcrValidated,
-                entity.FaceMatchValidated,
-                entity.Status,
-                entity.CreatedAt,
-                entity.UpdatedAt,
-                entity.CreatedBy,
-                entity.UpdatedBy
+                k.Code,
+                k.CustomerId,
+                k.DocumentType,
+                k.DocumentNumber,
+                k.DocumentImageUrl,
+                k.SelfieImageUrl,
+                k.OcrValidated,
+                k.FaceMatchValidated,
+                k.Status,
+                k.CreatedAt,
+                k.UpdatedAt,
+                k.CreatedBy,
+                k.UpdatedBy
             );
     }
 }

@@ -1,16 +1,19 @@
-﻿using BNPL.Api.Server.src.Application.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Simulation;
+using BNPL.Api.Server.src.Application.Mappers;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Simulation
 {
-    public sealed class GetSimulationByIdUseCase(ISimulationRepository repository)
+    public sealed class GetSimulationByIdUseCase(ISimulationRepository simulationRepository)
     {
-        public async Task<ServiceResult<Domain.Entities.Simulation>> ExecuteAsync(Guid id)
+        public async Task<Result<SimulationDto, string>> ExecuteAsync(Guid id)
         {
-            var simulation = await repository.GetByIdAsync(id)
-                ?? throw new InvalidOperationException("Simulation not found.");
+            var simulation = await simulationRepository.GetByIdAsync(id);
+            if (simulation is null)
+                return Result<SimulationDto, string>.Fail("Simulation not found.");
 
-            return new ServiceResult<Domain.Entities.Simulation>(simulation);
+            return Result<SimulationDto, string>.Ok(simulation.ToDto());
         }
     }
 }

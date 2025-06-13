@@ -1,21 +1,32 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using Core.Context.Interfaces;
+using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Customer
 {
     public sealed class InactivateCustomerUseCase(
-        ICustomerRepository repository,
+        ICustomerRepository customerRepository,
+        IProposalRepository proposalRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid id)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid customerId)
         {
-            var now = DateTime.UtcNow;
+            var customer = await customerRepository.GetByIdAsync(customerId);
 
-            await repository.InactivateAsync(id, userContext.UserId, now);
+            if (customer is null)
+                return Result<bool, string>.Fail("Customer not found.");
 
-            return new ServiceResult<string>("Customer inactivated successfully.");
+            var hasPendingProposals = await proposalRepository.ExistsActiveByCustomerIdAsync(customerId);
+
+            if (hasPendingProposals)
+                return Result<bool, string>.Fail("Customer has active credit proposals and cannot be inactivated.");
+
+            await customerRepository.InactivateAsync(customerId, userContext.GetRequiredUserId(), DateTime.UtcNow);
+
+            return Result<bool, string>.Ok(true);
         }
     }
 }

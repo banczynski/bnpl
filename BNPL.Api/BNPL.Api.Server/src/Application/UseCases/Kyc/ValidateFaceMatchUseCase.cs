@@ -1,40 +1,42 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services.External;
+﻿using Core.Context.Interfaces;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.External;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
     public sealed class ValidateFaceMatchUseCase(
-        IKycRepository repository,
+        IKycRepository kycRepository,
         IFaceMatchService faceMatchService,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid customerId)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid customerId)
         {
-            var entity = await repository.GetByCustomerIdAsync(customerId)
-                ?? throw new InvalidOperationException("KYC data not found.");
+            var entity = await kycRepository.GetByCustomerIdAsync(customerId);
+
+            if (entity is null)
+                return Result<bool, string>.Fail("KYC data not found.");
 
             if (string.IsNullOrWhiteSpace(entity.DocumentImageUrl) || string.IsNullOrWhiteSpace(entity.SelfieImageUrl))
-                throw new InvalidOperationException("Missing images for face validation.");
+                return Result<bool, string>.Fail("Missing images for face validation.");
 
-            // TODO
             var valid = await faceMatchService.ValidateAsync(
                 new Uri(entity.DocumentImageUrl),
                 new Uri(entity.SelfieImageUrl)
             );
 
             if (!valid)
-                throw new InvalidOperationException("Face match validation failed.");
+                return Result<bool, string>.Fail("Face match validation failed.");
 
             entity.FaceMatchValidated = true;
             entity.UpdatedAt = DateTime.UtcNow;
-            entity.UpdatedBy = userContext.UserId;
+            entity.UpdatedBy = userContext.GetRequiredUserId();
 
-            await repository.UpdateAsync(entity);
+            await kycRepository.UpdateAsync(entity);
 
-            return new ServiceResult<string>("Face match validation successful.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

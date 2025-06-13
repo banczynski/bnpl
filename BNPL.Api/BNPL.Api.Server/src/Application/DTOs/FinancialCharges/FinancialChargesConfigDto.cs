@@ -1,6 +1,7 @@
 ﻿namespace BNPL.Api.Server.src.Application.DTOs.FinancialCharges
 {
     public sealed record FinancialChargesConfigDto(
+        Guid Id,
         Guid PartnerId,
         Guid? AffiliateId,
         decimal InterestRate,
@@ -11,7 +12,7 @@
         bool IsActive,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        string CreatedBy,
-        string UpdatedBy
+        Guid CreatedBy,
+        Guid UpdatedBy
     );
 }

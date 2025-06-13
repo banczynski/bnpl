@@ -1,5 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Invoice;
-using BNPL.Api.Server.src.Application.Services.External;
+﻿using BNPL.Api.Server.src.Application.Abstractions.External;
+using BNPL.Api.Server.src.Application.DTOs.Invoice;
 
 namespace BNPL.Api.Server.src.Infrastructure.Services.External
 {

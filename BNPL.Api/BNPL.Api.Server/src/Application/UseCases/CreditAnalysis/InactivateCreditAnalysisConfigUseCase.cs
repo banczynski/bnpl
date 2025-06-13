@@ -1,18 +1,19 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using Core.Context.Interfaces;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
 {
     public sealed class InactivateCreditAnalysisConfigUseCase(
-        ICreditAnalysisConfigurationRepository repository,
+        ICreditAnalysisConfigurationRepository creditAnalysisRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid partnerId, Guid? affiliateId)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid partnerId, Guid? affiliateId)
         {
-            await repository.InactivateAsync(partnerId, affiliateId, userContext.UserId, DateTime.UtcNow);
-            return new ServiceResult<string>("Configuration inactivated.");
+            await creditAnalysisRepository.InactivateAsync(partnerId, affiliateId, userContext.GetRequiredUserId(), DateTime.UtcNow);
+            return Result<bool, string>.Ok(true);
         }
     }
 }

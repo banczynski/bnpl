@@ -1,21 +1,22 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using Core.Context.Interfaces;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.FinancialCharges
 {
     public sealed class InactivateFinancialChargesConfigUseCase(
-        IFinancialChargesConfigurationRepository repository,
+        IFinancialChargesConfigurationRepository financialChargesConfigurationRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid partnerId, Guid? affiliateId)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid partnerId, Guid? affiliateId)
         {
             var now = DateTime.UtcNow;
 
-            await repository.InactivateAsync(partnerId, affiliateId, userContext.UserId, now);
+            await financialChargesConfigurationRepository.InactivateAsync(partnerId, affiliateId, userContext.GetRequiredUserId(), now);
 
-            return new ServiceResult<string>("Configuration inactivated.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

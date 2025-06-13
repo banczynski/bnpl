@@ -5,20 +5,20 @@ namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class PartnerMapper
     {
-        public static Partner ToEntity(this CreatePartnerRequest request, Guid id, DateTime now, string user)
+        public static Partner ToEntity(this CreatePartnerRequest request, Guid user)
             => new()
             {
-                Id = id,
+                Code = Guid.NewGuid(),
                 Name = request.Name,
                 TaxId = request.TaxId,
-                CreatedAt = now,
-                UpdatedAt = now,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user,
                 IsActive = true
             };
 
-        public static void UpdateEntity(this Partner entity, UpdatePartnerRequest request, DateTime now, string user)
+        public static void UpdateEntity(this Partner entity, UpdatePartnerRequest request, DateTime now, Guid user)
         {
             entity.Name = request.Name;
             entity.TaxId = request.TaxId;
@@ -26,16 +26,16 @@ namespace BNPL.Api.Server.src.Application.Mappers
             entity.UpdatedBy = user;
         }
 
-        public static PartnerDto ToDto(this Partner entity)
+        public static PartnerDto ToDto(this Partner p)
             => new(
-                entity.Id,
-                entity.Name,
-                entity.TaxId,
-                entity.IsActive,
-                entity.CreatedAt,
-                entity.UpdatedAt,
-                entity.CreatedBy,
-                entity.UpdatedBy
+                p.Code,
+                p.Name,
+                p.TaxId,
+                p.IsActive,
+                p.CreatedAt,
+                p.UpdatedAt,
+                p.CreatedBy,
+                p.UpdatedBy
             );
     }
 }

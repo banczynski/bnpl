@@ -1,31 +1,60 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Invoice
 {
     public sealed class MarkOverdueInvoicesUseCase(
         IInvoiceRepository invoiceRepository,
+        IInstallmentRepository installmentRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<int>> ExecuteAsync()
+        public async Task<Result<int, string>> ExecuteAsync()
         {
-            var today = DateTime.UtcNow.Date;
-            var overdueInvoices = await invoiceRepository.GetOverduePendingAsync(today);
+            using var scope = unitOfWork;
 
-            int count = 0;
-
-            foreach (var invoice in overdueInvoices)
+            try
             {
-                invoice.MarkAsOverdue(today, userContext.UserId);
+                scope.Begin();
 
-                await invoiceRepository.UpdateAsync(invoice);
-                count++;
+                var today = DateTime.UtcNow.Date;
+                var overdueInvoices = await invoiceRepository.GetOverduePendingAsync(today, scope.Transaction);
+
+                int count = 0;
+                var installments = new List<Domain.Entities.Installment>();
+
+                foreach (var invoice in overdueInvoices)
+                {
+                    invoice.MarkAsOverdue(today, userContext.GetRequiredUserId());
+                    count++;
+
+                    installments = [.. (await installmentRepository.GetByInvoiceIdAsync(invoice.Code, scope.Transaction))];
+                    foreach (var i in installments)
+                    {
+                        if (i.Status != InstallmentStatus.Paid && i.IsActive)
+                        {
+                            i.MarkAsOverdue(today, userContext.GetRequiredUserId());
+                        }
+                    }
+                }
+
+                await invoiceRepository.UpdateManyAsync(overdueInvoices, scope.Transaction);
+                await installmentRepository.UpdateManyAsync(installments, scope.Transaction);
+
+                scope.Commit();
+
+                return Result<int, string>.Ok(count);
             }
-
-            return new ServiceResult<int>(count, [$"{count} overdue invoices marked."]);
+            catch
+            {
+                scope.Rollback();
+                throw;
+            }
         }
     }
 }

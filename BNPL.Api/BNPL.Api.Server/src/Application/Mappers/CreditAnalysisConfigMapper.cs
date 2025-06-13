@@ -5,42 +5,53 @@ namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class CreditAnalysisConfigMapper
     {
-        public static CreditAnalysisConfiguration ToEntity(this CreateCreditAnalysisConfigRequest request, DateTime now, string user)
+        public static CreditAnalysisConfiguration ToEntity(this CreateCreditAnalysisConfigRequest request, Guid partnerId, Guid? affiliateId, Guid user)
             => new()
             {
-                PartnerId = request.PartnerId,
-                AffiliateId = request.AffiliateId,
+                Code = Guid.NewGuid(),
+                PartnerId = partnerId,
+                AffiliateId = affiliateId,
                 MinApprovedPercentage = request.MinApprovedPercentage,
                 MaxApprovedPercentage = request.MaxApprovedPercentage,
                 RejectionThreshold = request.RejectionThreshold,
-                CreatedAt = now,
-                UpdatedAt = now,
+                MaxCreditAmount = request.MaxCreditAmount,
+                MaxInstallments = request.MaxInstallments,
+                MonthlyInterestRate = request.MonthlyInterestRate,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user,
                 IsActive = true
             };
 
-        public static void UpdateEntity(this CreditAnalysisConfiguration entity, UpdateCreditAnalysisConfigRequest request, DateTime now, string user)
+        public static void UpdateEntity(this CreditAnalysisConfiguration entity, UpdateCreditAnalysisConfigRequest request, DateTime now, Guid user)
         {
             entity.MinApprovedPercentage = request.MinApprovedPercentage;
             entity.MaxApprovedPercentage = request.MaxApprovedPercentage;
             entity.RejectionThreshold = request.RejectionThreshold;
+            entity.MaxCreditAmount = request.MaxCreditAmount;
+            entity.MaxInstallments = request.MaxInstallments;
+            entity.MonthlyInterestRate = request.MonthlyInterestRate;
             entity.UpdatedAt = now;
             entity.UpdatedBy = user;
         }
 
-        public static CreditAnalysisConfigDto ToDto(this CreditAnalysisConfiguration config)
+        public static CreditAnalysisConfigDto ToDto(this CreditAnalysisConfiguration c)
             => new(
-                config.PartnerId,
-                config.AffiliateId,
-                config.MinApprovedPercentage,
-                config.MaxApprovedPercentage,
-                config.RejectionThreshold,
-                config.IsActive,
-                config.CreatedAt,
-                config.UpdatedAt,
-                config.CreatedBy,
-                config.UpdatedBy
+                c.Code,
+                c.PartnerId,
+                c.AffiliateId,
+                c.MinApprovedPercentage,
+                c.MaxApprovedPercentage,
+                c.RejectionThreshold,
+                c.MaxCreditAmount,
+                c.MaxInstallments,
+                c.MonthlyInterestRate,
+                c.IsActive,
+                c.CreatedAt,
+                c.UpdatedAt,
+                c.CreatedBy,
+                c.UpdatedBy
             );
     }
 }

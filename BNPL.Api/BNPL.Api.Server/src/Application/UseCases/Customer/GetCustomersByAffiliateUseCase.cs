@@ -1,16 +1,16 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Customer;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Customer;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Customer
 {
-    public sealed class GetCustomersByAffiliateUseCase(ICustomerRepository repository)
+    public sealed class GetCustomersByAffiliateUseCase(ICustomerRepository customerRepository)
     {
-        public async Task<ServiceResult<IEnumerable<CustomerDto>>> ExecuteAsync(Guid affiliateId, bool onlyActive = true)
+        public async Task<Result<IEnumerable<CustomerDto>, string>> ExecuteAsync(Guid affiliateId, bool onlyActive = true)
         {
-            var customers = await repository.GetByAffiliateIdAsync(affiliateId, onlyActive);
-            return new ServiceResult<IEnumerable<CustomerDto>>(customers.Select(c => c.ToDto()));
+            var customers = await customerRepository.GetByAffiliateIdAsync(affiliateId, onlyActive);
+            return Result<IEnumerable<CustomerDto>, string>.Ok(customers.Select(c => c.ToDto()));
         }
     }
 }

@@ -1,53 +1,90 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.Customer;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using BNPL.Api.Server.src.Domain.Entities;
 using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Customer
 {
     public sealed class CreateCustomerUseCase(
-        ICustomerRepository repository,
+        ICustomerRepository customerRepository,
+        ICustomerBillingPreferencesRepository customerBillingPreferencesRepository,
+        IAffiliateRepository affiliateRepository,
         IKycRepository kycRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<CreateCustomerResponse>> ExecuteAsync(CreateCustomerRequest request)
+        public async Task<Result<CreateCustomerResponse, string>> ExecuteAsync(Guid affiliateId, CreateCustomerRequest request)
         {
-            var now = DateTime.UtcNow;
-            var id = Guid.NewGuid();
+            using var scope = unitOfWork;
 
-            var entity = request.ToEntity(id, now, userContext.UserId);
-            await repository.InsertAsync(entity);
-
-            if (request.SkipKyc)
+            try
             {
-                var existingKyc = await kycRepository.GetByCustomerIdAsync(id);
-                if (existingKyc is null)
+                var partnerId = await affiliateRepository.GetPartnerIdByAffiliateIdAsync(affiliateId);
+                if (partnerId.GetValueOrDefault() == Guid.Empty)
+                    return Result<CreateCustomerResponse, string>.Fail("Affiliate not found.");
+
+                var existingCustomers = await customerRepository.GetByTaxIdAsync(request.TaxId);
+                if (existingCustomers is not null && existingCustomers.Any(c => c?.PartnerId == partnerId || c?.AffiliateId == affiliateId))
+                    return Result<CreateCustomerResponse, string>.Fail("A customer with the provided Tax ID already exists for this partner or affiliate.");
+
+                scope.Begin();
+
+                var entity = request.ToEntity(partnerId.Value, affiliateId, userContext.GetRequiredUserId());
+
+                await customerRepository.InsertAsync(entity, scope.Transaction);
+
+                var billingPreferences = new CustomerBillingPreferences
                 {
-                    var kyc = new Domain.Entities.Kyc
+                    CustomerId = entity.Code,
+                    AffiliateId = affiliateId,
+                    InvoiceDueDay = 10,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow,
+                    CreatedBy = userContext.GetRequiredUserId(),
+                    UpdatedBy = userContext.GetRequiredUserId(),
+                    ConsolidatedInvoiceEnabled = false
+                };
+
+                await customerBillingPreferencesRepository.InsertAsync(billingPreferences, scope.Transaction);
+
+                if (request.SkipKyc)
+                {
+                    var existingKyc = await kycRepository.GetByCustomerIdAsync(entity.Code, scope.Transaction);
+                    if (existingKyc is null)
                     {
-                        Id = Guid.NewGuid(),
-                        CustomerId = id,
-                        Status = KycStatus.Validated,
-                        OcrValidated = true,
-                        FaceMatchValidated = true,
-                        CreatedAt = now,
-                        UpdatedAt = now,
-                        CreatedBy = userContext.UserId,
-                        UpdatedBy = userContext.UserId,
-                        IsActive = true
-                    };
+                        var kyc = new Domain.Entities.Kyc
+                        {
+                            Code = Guid.NewGuid(),
+                            CustomerId = entity.Code,
+                            Status = KycStatus.Validated,
+                            OcrValidated = true,
+                            FaceMatchValidated = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow,
+                            CreatedBy = userContext.GetRequiredUserId(),
+                            UpdatedBy = userContext.GetRequiredUserId(),
+                            IsActive = true
+                        };
 
-                    await kycRepository.InsertAsync(kyc);
+                        await kycRepository.InsertAsync(kyc, scope.Transaction);
+                    }
                 }
-            }
 
-            return new ServiceResult<CreateCustomerResponse>(
-                new CreateCustomerResponse(entity.Id),
-                ["Customer created successfully."]
-            );
+                scope.Commit();
+
+                return Result<CreateCustomerResponse, string>.Ok(new CreateCustomerResponse(entity.Code));
+            }
+            catch
+            {
+                scope.Rollback();
+                throw;
+            }
         }
     }
 }

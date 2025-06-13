@@ -11,10 +11,11 @@ namespace BNPL.Api.Server.src.Application.DTOs.Invoice
         DateTime DueDate,
         decimal TotalAmount,
         InvoiceStatus Status,
+        bool IsIndividual,
         bool IsActive,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        string CreatedBy,
-        string UpdatedBy
+        Guid CreatedBy,
+        Guid UpdatedBy
     );
 }

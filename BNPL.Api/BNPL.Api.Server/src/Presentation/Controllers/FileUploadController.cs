@@ -1,9 +1,11 @@
-﻿using BNPL.Api.Server.src.Application.Services;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Storage;
 using BNPL.Api.Server.src.Domain.Enums;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BNPL.Api.Server.src.Presentation.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public sealed class FileUploadController(IS3StorageService s3StorageService) : ControllerBase
@@ -14,7 +16,7 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
             if (string.IsNullOrWhiteSpace(fileName))
                 return BadRequest("fileName is required.");
 
-            var folder = documentType.ToString().ToLowerInvariant(); 
+            var folder = documentType.ToString().ToLowerInvariant();
 
             var url = s3StorageService.GeneratePresignedUploadUrl(fileName, folder, TimeSpan.FromMinutes(10));
             return Ok(url);

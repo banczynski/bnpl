@@ -1,10 +1,12 @@
 ﻿using BNPL.Api.Server.src.Application.DTOs.Customer;
 using BNPL.Api.Server.src.Application.UseCases.Customer;
 using Core.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BNPL.Api.Server.src.Presentation.Controllers
 {
+    [Authorize]
     [ApiController]
     [Route("api/[controller]")]
     public sealed class CustomerController(
@@ -16,31 +18,33 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
         GetCustomersByPartnerUseCase getByPartnerUseCase
     ) : ControllerBase
     {
-        [HttpPost]
-        public async Task<ActionResult<ServiceResult<CreateCustomerResponse>>> Create([FromBody] CreateCustomerRequest request)
+        [HttpPost("{affiliateId:guid}")]
+        public async Task<ActionResult<Result<CreateCustomerResponse, string>>> Create(
+            Guid affiliateId,
+            [FromBody] CreateCustomerRequest request)
         {
-            var result = await createUseCase.ExecuteAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result);
+            var result = await createUseCase.ExecuteAsync(affiliateId, request);
+            return CreatedAtAction(nameof(GetById), new { id = result is Result<CreateCustomerResponse, string>.Success s ? s.Value.Id : Guid.Empty }, result);
         }
 
         [HttpPut("{id:guid}")]
-        public async Task<ActionResult<ServiceResult<CustomerDto>>> Update(Guid id, [FromBody] UpdateCustomerRequest request)
+        public async Task<ActionResult<Result<CustomerDto, string>>> Update(Guid id, [FromBody] UpdateCustomerRequest request)
             => Ok(await updateUseCase.ExecuteAsync(id, request));
 
         [HttpDelete("{id:guid}")]
-        public async Task<ActionResult<ServiceResult<string>>> Inactivate(Guid id)
+        public async Task<ActionResult<Result<string, string>>> Inactivate(Guid id)
             => Ok(await inactivateUseCase.ExecuteAsync(id));
 
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<ServiceResult<CustomerDto>>> GetById(Guid id)
+        public async Task<ActionResult<Result<CustomerDto, string>>> GetById(Guid id)
             => Ok(await getByIdUseCase.ExecuteAsync(id));
 
         [HttpGet("by-affiliate/{affiliateId:guid}")]
-        public async Task<ActionResult<ServiceResult<IEnumerable<CustomerDto>>>> GetByAffiliate(Guid affiliateId, [FromQuery] bool onlyActive = true)
+        public async Task<ActionResult<Result<IEnumerable<CustomerDto>, string>>> GetByAffiliate(Guid affiliateId, [FromQuery] bool onlyActive = true)
             => Ok(await getByAffiliateUseCase.ExecuteAsync(affiliateId, onlyActive));
 
         [HttpGet("by-partner/{partnerId:guid}")]
-        public async Task<ActionResult<ServiceResult<IEnumerable<CustomerDto>>>> GetByPartner(Guid partnerId, [FromQuery] bool onlyActive = true)
+        public async Task<ActionResult<Result<IEnumerable<CustomerDto>, string>>> GetByPartner(Guid partnerId, [FromQuery] bool onlyActive = true)
             => Ok(await getByPartnerUseCase.ExecuteAsync(partnerId, onlyActive));
     }
 }

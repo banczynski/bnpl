@@ -1,8 +1,9 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.Kyc;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services.External;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.External;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
@@ -12,22 +13,22 @@ namespace BNPL.Api.Server.src.Application.UseCases.Kyc
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<OcrExtractionResult>> ExecuteAsync(Guid customerId, AnalyzeCustomerDocumentRequest request)
+        public async Task<Result<OcrExtractionResult, string>> ExecuteAsync(Guid customerId, AnalyzeCustomerDocumentRequest request)
         {
-            var entity = await kycRepository.GetByCustomerIdAsync(customerId)
-                ?? throw new InvalidOperationException("Customer KYC data not found.");
+            var entity = await kycRepository.GetByCustomerIdAsync(customerId);
+            if (entity is null)
+                return Result<OcrExtractionResult, string>.Fail("Customer KYC data not found.");
 
-            // TODO
             var result = await ocrService.AnalyzeAsync(request.DocumentImageUrl);
 
             entity.DocumentNumber = result.DocumentNumber;
             entity.OcrValidated = true;
             entity.UpdatedAt = DateTime.UtcNow;
-            entity.UpdatedBy = userContext.UserId;
+            entity.UpdatedBy = userContext.GetRequiredUserId();
 
             await kycRepository.UpdateAsync(entity);
 
-            return new ServiceResult<OcrExtractionResult>(result, ["OCR analysis completed successfully."]);
+            return Result<OcrExtractionResult, string>.Ok(result);
         }
     }
 }

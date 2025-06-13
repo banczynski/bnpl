@@ -5,24 +5,24 @@ namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class CustomerMapper
     {
-        public static Customer ToEntity(this CreateCustomerRequest request, Guid id, DateTime now, string user)
+        public static Customer ToEntity(this CreateCustomerRequest request, Guid partnerId, Guid affiliateId, Guid user)
             => new()
             {
-                Id = id,
-                PartnerId = request.PartnerId,
-                AffiliateId = request.AffiliateId,
+                Code = Guid.NewGuid(),
+                PartnerId = partnerId,
+                AffiliateId = affiliateId,
                 TaxId = request.TaxId,
                 Name = request.Name,
                 Email = request.Email,
                 Phone = request.Phone,
-                CreatedAt = now,
-                UpdatedAt = now,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user,
                 IsActive = true
             };
 
-        public static void UpdateEntity(this Customer entity, UpdateCustomerRequest request, DateTime now, string user)
+        public static void UpdateEntity(this Customer entity, UpdateCustomerRequest request, DateTime now, Guid user)
         {
             entity.Name = request.Name;
             entity.Email = request.Email;
@@ -31,20 +31,20 @@ namespace BNPL.Api.Server.src.Application.Mappers
             entity.UpdatedBy = user;
         }
 
-        public static CustomerDto ToDto(this Customer entity)
+        public static CustomerDto ToDto(this Customer c)
             => new(
-                entity.Id,
-                entity.PartnerId,
-                entity.AffiliateId,
-                entity.TaxId,
-                entity.Name,
-                entity.Email,
-                entity.Phone,
-                entity.IsActive,
-                entity.CreatedAt,
-                entity.UpdatedAt,
-                entity.CreatedBy,
-                entity.UpdatedBy
+                c.Code,
+                c.PartnerId,
+                c.AffiliateId,
+                c.TaxId,
+                c.Name,
+                c.Email,
+                c.Phone,
+                c.IsActive,
+                c.CreatedAt,
+                c.UpdatedAt,
+                c.CreatedBy,
+                c.UpdatedBy
             );
     }
 }

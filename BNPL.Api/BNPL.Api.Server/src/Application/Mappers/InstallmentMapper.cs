@@ -7,32 +7,30 @@ namespace BNPL.Api.Server.src.Application.Mappers
     public static class InstallmentMapper
     {
         public static Installment ToEntity(
-            Guid id,
-            Guid PartnerId,
-            Guid AffiliateId,
-            Guid proposalId,
-            Guid? renegotiationId,
+            Guid partnerId,
+            Guid affiliateId,
+            Guid? proposalId,
             Guid customerId,
             string customerTaxId,
             int sequence,
             DateTime dueDate,
             decimal amount,
             DateTime now,
-            string user
+            Guid user
         ) => new()
         {
-            Id = id,
-            PartnerId = PartnerId,
-            AffiliateId = AffiliateId,
+            Code = Guid.NewGuid(),
+            PartnerId = partnerId,
+            AffiliateId = affiliateId,
             ProposalId = proposalId,
             CustomerId = customerId,
-            RenegotiationId = renegotiationId,
             CustomerTaxId = customerTaxId,
             Sequence = sequence,
             DueDate = dueDate,
             Amount = amount,
             Status = InstallmentStatus.Pending,
             InvoiceId = null,
+            PaymentId = null,
             CreatedAt = now,
             UpdatedAt = now,
             CreatedBy = user,
@@ -40,53 +38,22 @@ namespace BNPL.Api.Server.src.Application.Mappers
             IsActive = true
         };
 
-        public static InstallmentDto ToDto(this Installment i)
-            => new(
-                i.Id,
-                i.PartnerId,
-                i.AffiliateId,
-                i.ProposalId,
-                i.RenegotiationId,
-                i.CustomerId,
-                i.CustomerTaxId,
-                i.Sequence,
-                i.DueDate,
-                i.Amount,
-                i.Status,
-                i.InvoiceId
-            );
+        public static InstallmentDto ToDto(this Installment i) => new(
+            i.Code,
+            i.PartnerId,
+            i.AffiliateId,
+            i.ProposalId,
+            i.CustomerId,
+            i.CustomerTaxId,
+            i.Sequence,
+            i.DueDate,
+            i.Amount,
+            i.Status,
+            i.InvoiceId,
+            i.PaymentId
+        );
 
-        public static Installment ToEntityFromRenegotiation(
-            Guid id,
-            Guid PartnerId,
-            Guid AffiliateId,
-            Guid renegotiationId,
-            Guid customerId,
-            string customerTaxId,
-            int sequence,
-            DateTime dueDate,
-            decimal amount,
-            DateTime now,
-            string user
-            ) => new()
-            {
-                Id = id,
-                PartnerId = PartnerId,
-                AffiliateId = AffiliateId,
-                ProposalId = null,
-                CustomerId = customerId,
-                RenegotiationId = renegotiationId,
-                CustomerTaxId = customerTaxId,
-                Sequence = sequence,
-                DueDate = dueDate,
-                Amount = amount,
-                Status = InstallmentStatus.Pending,
-                InvoiceId = null,
-                CreatedAt = now,
-                UpdatedAt = now,
-                CreatedBy = user,
-                UpdatedBy = user,
-                IsActive = true
-            };
+        public static IEnumerable<InstallmentDto> ToDtoList(this IEnumerable<Installment> installments)
+            => [.. installments.Select(i => i.ToDto())];
     }
 }

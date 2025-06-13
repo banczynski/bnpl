@@ -1,11 +1,10 @@
-﻿using BNPL.Api.Server.src.Domain.Enums;
-
-namespace BNPL.Api.Server.src.Application.DTOs.Proposal
+﻿namespace BNPL.Api.Server.src.Application.DTOs.Proposal
 {
     public sealed record UpdateProposalRequest(
         decimal RequestedAmount,
-        decimal ApprovedAmount,
+        decimal TotalWithCharges,
         int Installments,
-        decimal MonthlyInterestRate
+        decimal MonthlyInterestRate,
+        int PreferredDueDay
     );
 }

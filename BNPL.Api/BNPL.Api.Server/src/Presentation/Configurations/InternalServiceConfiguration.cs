@@ -1,8 +1,11 @@
 ﻿using Amazon.S3;
-using BNPL.Api.Server.src.Application.Context;
-using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Services;
+using BNPL.Api.Server.src.Application.Abstractions.Business;
+using BNPL.Api.Server.src.Application.Abstractions.Notification;
+using BNPL.Api.Server.src.Application.Abstractions.Storage;
 using BNPL.Api.Server.src.Infrastructure.Services;
+using BNPL.Api.Server.src.Infrastructure.Services.Business;
+using Core.Context;
+using Core.Context.Interfaces;
 
 namespace BNPL.Api.Server.src.Presentation.Configurations
 {
@@ -17,6 +20,9 @@ namespace BNPL.Api.Server.src.Presentation.Configurations
             services.AddScoped<ICreditAnalysisConfigurationService, CreditAnalysisConfigurationService>();
             services.AddScoped<IFinancialChargesConfigurationService, FinancialChargesConfigurationService>();
             services.AddScoped<IS3StorageService, S3StorageService>();
+            services.AddScoped<INotificationService, NotificationService>();
+            services.AddScoped<IInstallmentCalculator, InstallmentCalculator>();
+
             return services;
         }
     }

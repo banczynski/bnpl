@@ -1,26 +1,25 @@
 ﻿using BNPL.Api.Server.src.Application.DTOs.Affiliate;
-using BNPL.Api.Server.src.Application.DTOs.Partner;
 using BNPL.Api.Server.src.Domain.Entities;
 
 namespace BNPL.Api.Server.src.Application.Mappers
 {
     public static class AffiliateMapper
     {
-        public static Affiliate ToEntity(this CreateAffiliateRequest request, Guid id, DateTime now, string user)
+        public static Affiliate ToEntity(this CreateAffiliateRequest request, Guid partnerId, Guid user)
             => new()
             {
-                Id = id,
-                PartnerId = request.PartnerId,
+                Code = Guid.NewGuid(),
+                PartnerId = partnerId,
                 Name = request.Name,
                 TaxId = request.TaxId,
-                CreatedAt = now,
-                UpdatedAt = now,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
                 CreatedBy = user,
                 UpdatedBy = user,
                 IsActive = true
             };
 
-        public static void UpdateEntity(this Affiliate entity, UpdateAffiliateRequest request, DateTime now, string user)
+        public static void UpdateEntity(this Affiliate entity, UpdateAffiliateRequest request, DateTime now, Guid user)
         {
             entity.Name = request.Name;
             entity.TaxId = request.TaxId;
@@ -28,17 +27,17 @@ namespace BNPL.Api.Server.src.Application.Mappers
             entity.UpdatedBy = user;
         }
 
-        public static AffiliateDto ToDto(this Affiliate entity)
+        public static AffiliateDto ToDto(this Affiliate a)
             => new(
-                entity.Id,
-                entity.PartnerId,
-                entity.Name,
-                entity.TaxId,
-                entity.IsActive,
-                entity.CreatedAt,
-                entity.UpdatedAt,
-                entity.CreatedBy,
-                entity.UpdatedBy
+                a.Code,
+                a.PartnerId,
+                a.Name,
+                a.TaxId,
+                a.IsActive,
+                a.CreatedAt,
+                a.UpdatedAt,
+                a.CreatedBy,
+                a.UpdatedBy
             );
     }
 }

@@ -3,8 +3,6 @@
     public enum SignatureStatus
     {
         Pending = 0,
-        Signed = 1,
-        Rejected = 2,
-        Failed = 3
+        Signed = 1
     }
 }

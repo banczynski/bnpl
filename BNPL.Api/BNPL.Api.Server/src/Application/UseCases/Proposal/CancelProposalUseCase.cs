@@ -1,28 +1,51 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Notification;
+using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Proposal
 {
     public sealed class CancelProposalUseCase(
-        IProposalRepository repository,
+        IProposalRepository proposalRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid proposalId)
+        private const int MaxCancellationDays = 7;
+
+        public async Task<Result<bool, string>> ExecuteAsync(Guid proposalId)
         {
-            var proposal = await repository.GetByIdAsync(proposalId)
-                ?? throw new InvalidOperationException("Proposal not found.");
+            using var scope = unitOfWork;
 
-            if (proposal.Status is ProposalStatus.Signed or ProposalStatus.Formalized or ProposalStatus.Disbursed or ProposalStatus.Finalized)
-                throw new InvalidOperationException("Proposal cannot be cancelled in its current state.");
+            try
+            {
+                scope.Begin();
 
-            proposal.MarkAsCancelled(DateTime.UtcNow, userContext.UserId);
+                var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
+                if (proposal is null)
+                    return Result<bool, string>.Fail("Proposal not found.");
 
-            await repository.UpdateAsync(proposal);
+                if (proposal.Status is ProposalStatus.Active or ProposalStatus.Finalized or ProposalStatus.Cancelled)
+                    return Result<bool, string>.Fail("Proposal cannot be cancelled in its current state.");
 
-            return new ServiceResult<string>("Proposal cancelled successfully.");
+                if (proposal.CreatedAt < DateTime.UtcNow.AddDays(-MaxCancellationDays))
+                    return Result<bool, string>.Fail("The cancellation period has expired.");
+
+                proposal.MarkAsCancelled(DateTime.UtcNow, userContext.GetRequiredUserId());
+                await proposalRepository.UpdateAsync(proposal, scope.Transaction);
+
+                scope.Commit();
+
+                return Result<bool, string>.Ok(true);
+            }
+            catch
+            {
+                scope.Rollback();
+                throw;
+            }
         }
     }
 }

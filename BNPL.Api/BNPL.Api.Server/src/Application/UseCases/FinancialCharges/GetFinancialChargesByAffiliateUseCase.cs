@@ -1,18 +1,21 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.FinancialCharges
 {
-    public sealed class GetFinancialChargesByAffiliateUseCase(IFinancialChargesConfigurationRepository repository)
+    public sealed class GetFinancialChargesByAffiliateUseCase(
+        IFinancialChargesConfigurationRepository financialChargesConfigurationRepository)
     {
-        public async Task<ServiceResult<FinancialChargesConfigDto>> ExecuteAsync(Guid affiliateId)
+        public async Task<Result<FinancialChargesConfigDto, string>> ExecuteAsync(Guid affiliateId)
         {
-            var config = await repository.GetByAffiliateAsync(affiliateId)
-                ?? throw new InvalidOperationException("Configuration not found.");
+            var config = await financialChargesConfigurationRepository.GetByAffiliateAsync(affiliateId);
 
-            return new ServiceResult<FinancialChargesConfigDto>(config.ToDto());
+            if (config is null)
+                return Result<FinancialChargesConfigDto, string>.Fail("Configuration not found.");
+
+            return Result<FinancialChargesConfigDto, string>.Ok(config.ToDto());
         }
     }
 }

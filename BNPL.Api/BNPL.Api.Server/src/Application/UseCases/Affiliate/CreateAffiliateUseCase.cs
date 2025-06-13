@@ -1,26 +1,29 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.Affiliate;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Affiliate
 {
     public sealed class CreateAffiliateUseCase(
         IAffiliateRepository repository,
+        IPartnerRepository partnerRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<CreateAffiliateResponse>> ExecuteAsync(CreateAffiliateRequest request)
+        public async Task<Result<CreateAffiliateResponse, string>> ExecuteAsync(Guid partnerId, CreateAffiliateRequest request)
         {
-            var now = DateTime.UtcNow;
-            var id = Guid.NewGuid();
+            var partnerExists = await partnerRepository.GetByIdAsync(partnerId);
+            if (partnerExists is null)
+                return Result<CreateAffiliateResponse, string>.Fail("Partner not found.");
 
-            var entity = request.ToEntity(id, now, userContext.UserId);
+            var entity = request.ToEntity(partnerId, userContext.GetRequiredUserId());
             await repository.InsertAsync(entity);
 
-            var response = new CreateAffiliateResponse(entity.Id);
-            return new ServiceResult<CreateAffiliateResponse>(response, ["Affiliate created successfully."]);
+            var response = new CreateAffiliateResponse(entity.Code);
+            return Result<CreateAffiliateResponse, string>.Ok(response);
         }
     }
 }

@@ -1,43 +1,49 @@
-﻿using BNPL.Api.Server.src.Application.Context;
-using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Domain.Enums;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
     public sealed class ValidateKycStatusUseCase(
-        IKycRepository repository,
-        IProposalRepository proposalRepository,
+        IKycRepository kycRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid customerId)
+        public async Task<Result<string, string[]>> ExecuteAsync(Guid customerId)
         {
-            var entity = await repository.GetByCustomerIdAsync(customerId)
-                ?? throw new InvalidOperationException("KYC data not found.");
+            using var scope = unitOfWork;
 
-            if (entity.OcrValidated && entity.FaceMatchValidated)
+            try
             {
-                entity.MarkAsValidated(DateTime.UtcNow, userContext.UserId);
+                scope.Begin();
 
-                await repository.UpdateAsync(entity);
+                var entity = await kycRepository.GetByCustomerIdAsync(customerId, scope.Transaction);
+                if (entity is null)
+                    return Result<string, string[]>.Fail(["KYC data not found."]);
 
-                var proposal = await proposalRepository.GetByCustomerIdAsync(customerId);
-
-                if (proposal != null)
+                if (entity.OcrValidated && entity.FaceMatchValidated)
                 {
-                    proposal.MarkAsAwaitingSignature(DateTime.UtcNow, userContext.UserId);
-                    await proposalRepository.UpdateAsync(proposal);
+                    entity.MarkAsValidated(DateTime.UtcNow, userContext.GetRequiredUserId());
+                    await kycRepository.UpdateAsync(entity, scope.Transaction);
+
+                    scope.Commit();
+                    return Result<string, string[]>.Ok("KYC status set to Validated.");
                 }
 
-                return new ServiceResult<string>("KYC status set to Validated.");
+                return Result<string, string[]>.Fail([
+                    $"KYC not fully validated.",
+                    $"OCR: {entity.OcrValidated}",
+                    $"FaceMatch: {entity.FaceMatchValidated}"
+                ]);
             }
-
-            return new ServiceResult<string>(
-                "KYC not fully validated.",
-                [$"OCR: {entity.OcrValidated}", $"FaceMatch: {entity.FaceMatchValidated}"]
-            );
+            catch
+            {
+                scope.Rollback();
+                throw;
+            }
         }
     }
 }

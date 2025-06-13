@@ -1,4 +1,4 @@
-﻿using BNPL.Api.Server.src.Application.Services.External;
+﻿using BNPL.Api.Server.src.Application.Abstractions.External;
 
 namespace BNPL.Api.Server.src.Infrastructure.Services.External
 {

@@ -7,13 +7,13 @@ namespace BNPL.Api.Server.src.Application.DTOs.Installment
         Guid PartnerId,
         Guid AffiliateId,
         Guid? ProposalId,
-        Guid? RenegotiationId,
         Guid CustomerId,
         string CustomerTaxId,
         int Sequence,
         DateTime DueDate,
         decimal Amount,
         InstallmentStatus Status,
-        Guid? InvoiceId
+        Guid? InvoiceId,
+        Guid? PaymentId
     );
 }

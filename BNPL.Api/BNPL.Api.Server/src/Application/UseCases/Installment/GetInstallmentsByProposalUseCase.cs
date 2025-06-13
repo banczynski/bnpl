@@ -1,16 +1,16 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Installment;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Installment;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Installment
 {
-    public sealed class GetInstallmentsByProposalUseCase(IInstallmentRepository repository)
+    public sealed class GetInstallmentsByProposalUseCase(IInstallmentRepository installmentRepository)
     {
-        public async Task<ServiceResult<IEnumerable<InstallmentDto>>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<IEnumerable<InstallmentDto>, string>> ExecuteAsync(Guid proposalId)
         {
-            var list = await repository.GetByProposalIdAsync(proposalId);
-            return new ServiceResult<IEnumerable<InstallmentDto>>(list.Select(i => i.ToDto()));
+            var list = await installmentRepository.GetByProposalIdAsync(proposalId);
+            return Result<IEnumerable<InstallmentDto>, string>.Ok(list.ToDtoList());
         }
     }
 }

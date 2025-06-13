@@ -1,23 +1,23 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.FinancialCharges
 {
     public sealed class CreateFinancialChargesConfigUseCase(
-        IFinancialChargesConfigurationRepository repository,
+        IFinancialChargesConfigurationRepository financialChargesConfigurationRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(CreateFinancialChargesConfigRequest request)
+        public async Task<Result<FinancialChargesConfigDto, string>> ExecuteAsync(Guid partnerId, Guid? affiliateId, CreateFinancialChargesConfigRequest request)
         {
-            var now = DateTime.UtcNow;
-            var entity = request.ToEntity(now, userContext.UserId);
-            await repository.InsertAsync(entity);
+            var entity = request.ToEntity(partnerId, affiliateId, userContext.GetRequiredUserId());
+            await financialChargesConfigurationRepository.InsertAsync(entity);
 
-            return new ServiceResult<string>("Financial charges configuration created.");
+            return Result<FinancialChargesConfigDto, string>.Ok(entity.ToDto());
         }
     }
 }

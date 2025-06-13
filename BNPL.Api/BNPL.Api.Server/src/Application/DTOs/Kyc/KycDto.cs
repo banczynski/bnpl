@@ -3,6 +3,7 @@
 namespace BNPL.Api.Server.src.Application.DTOs.Kyc
 {
     public sealed record KycDto(
+        Guid Id,
         Guid CustomerId,
         DocumentType? DocumentType,
         string? DocumentNumber,
@@ -13,7 +14,7 @@ namespace BNPL.Api.Server.src.Application.DTOs.Kyc
         KycStatus Status,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        string CreatedBy,
-        string UpdatedBy
+        Guid CreatedBy,
+        Guid UpdatedBy
     );
 }

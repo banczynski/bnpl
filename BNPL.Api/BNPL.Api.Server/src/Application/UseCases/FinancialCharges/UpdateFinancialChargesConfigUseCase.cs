@@ -1,29 +1,30 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.FinancialCharges
 {
     public sealed class UpdateFinancialChargesConfigUseCase(
-        IFinancialChargesConfigurationRepository repository,
+        IFinancialChargesConfigurationRepository financialChargesConfigurationRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid partnerId, Guid? affiliateId, UpdateFinancialChargesConfigRequest request)
+        public async Task<Result<FinancialChargesConfigDto, string>> ExecuteAsync(Guid partnerId, Guid? affiliateId, UpdateFinancialChargesConfigRequest request)
         {
             var entity = (affiliateId is not null
-                ? await repository.GetByAffiliateAsync(affiliateId.Value)
-                : await repository.GetByPartnerAsync(partnerId)) 
-                ?? throw new InvalidOperationException("Configuration not found.");
+                ? await financialChargesConfigurationRepository.GetByAffiliateAsync(affiliateId.Value)
+                : await financialChargesConfigurationRepository.GetByPartnerAsync(partnerId));
 
-            var now = DateTime.UtcNow;
-            entity.UpdateEntity(request, now, userContext.UserId);
+            if (entity is null)
+                return Result<FinancialChargesConfigDto, string>.Fail("Configuration not found.");
 
-            await repository.UpdateAsync(entity);
+            entity.UpdateEntity(request, DateTime.UtcNow, userContext.GetRequiredUserId());
+            await financialChargesConfigurationRepository.UpdateAsync(entity);
 
-            return new ServiceResult<string>("Configuration updated.");
+            return Result<FinancialChargesConfigDto, string>.Ok(entity.ToDto());
         }
     }
 }

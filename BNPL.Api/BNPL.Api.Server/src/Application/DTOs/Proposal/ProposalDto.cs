@@ -10,14 +10,15 @@ namespace BNPL.Api.Server.src.Application.DTOs.Proposal
         string CustomerTaxId,
         Guid SimulationId,
         decimal RequestedAmount,
-        decimal ApprovedAmount,
+        decimal TotalWithCharges,
         int Installments,
         decimal MonthlyInterestRate,
+        int PreferredDueDay,
         ProposalStatus Status,
         bool IsActive,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        string CreatedBy,
-        string UpdatedBy
+        Guid CreatedBy,
+        Guid UpdatedBy
     );
 }

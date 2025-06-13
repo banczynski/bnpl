@@ -1,26 +1,29 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.CreditLimit;
-using BNPL.Api.Server.src.Application.Repositories;
 using BNPL.Api.Server.src.Domain.Entities;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
+using System.Data;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
 {
     public sealed class UpsertCustomerCreditLimitUseCase(
-        ICustomerCreditLimitRepository repository,
+        ICustomerCreditLimitRepository customerCreditLimitRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(CreditLimitUpsertRequest request)
+        public async Task<Result<bool, string>> ExecuteAsync(CreditLimitUpsertRequest request, IDbTransaction? transaction = null)
         {
-            var existing = await repository.GetByTaxIdAsync(request.CustomerTaxId);
+            var existing = await customerCreditLimitRepository.GetByTaxIdAndAffiliateIdAsync(request.CustomerTaxId, request.AffiliateId, transaction);
+
             var now = DateTime.UtcNow;
 
             if (existing is null)
             {
                 var newEntity = new CustomerCreditLimit
                 {
-                    Id = Guid.NewGuid(),
+                    Code = Guid.NewGuid(),
                     PartnerId = request.PartnerId,
                     AffiliateId = request.AffiliateId,
                     CustomerTaxId = request.CustomerTaxId,
@@ -28,22 +31,22 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
                     UsedLimit = 0,
                     CreatedAt = now,
                     UpdatedAt = now,
-                    CreatedBy = userContext.UserId,
-                    UpdatedBy = userContext.UserId,
+                    CreatedBy = userContext.GetRequiredUserId(),
+                    UpdatedBy = userContext.GetRequiredUserId(),
                     IsActive = true
                 };
 
-                await repository.InsertAsync(newEntity);
+                await customerCreditLimitRepository.InsertAsync(newEntity, transaction);
             }
             else
             {
                 existing.ApprovedLimit = request.ApprovedLimit;
                 existing.UpdatedAt = now;
-                existing.UpdatedBy = userContext.UserId;
-                await repository.UpdateAsync(existing);
+                existing.UpdatedBy = userContext.GetRequiredUserId();
+                await customerCreditLimitRepository.UpdateAsync(existing, transaction);
             }
 
-            return new ServiceResult<string>("Customer credit limit upserted.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

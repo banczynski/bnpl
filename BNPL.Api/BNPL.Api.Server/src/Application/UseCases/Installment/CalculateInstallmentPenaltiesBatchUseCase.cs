@@ -1,6 +1,6 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Installment;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Business;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Installment;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Installment
@@ -11,10 +11,10 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
         IFinancialChargesConfigurationService configService
     )
     {
-        public async Task<ServiceResult<List<InstallmentChargesReportItem>>> ExecuteAsync(DateTime? referenceDate = null)
+        public async Task<Result<List<InstallmentChargesReportItem>, string>> ExecuteAsync(DateTime? referenceDate = null)
         {
             var today = (referenceDate ?? DateTime.UtcNow).Date;
-            var overdueInstallments = await installmentRepository.GetPendingDueInDaysAsync(-1); // vencidas
+            var overdueInstallments = await installmentRepository.GetPendingDueInDaysAsync(-1);
 
             var results = new List<InstallmentChargesReportItem>();
 
@@ -31,7 +31,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
                 ));
 
                 results.Add(new InstallmentChargesReportItem(
-                    InstallmentId: installment.Id,
+                    InstallmentId: installment.Code,
                     PartnerId: installment.PartnerId,
                     AffiliateId: installment.AffiliateId,
                     CustomerTaxId: installment.CustomerTaxId,
@@ -45,7 +45,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
                 ));
             }
 
-            return new ServiceResult<List<InstallmentChargesReportItem>>(results, ["Penalties calculated for overdue installments."]);
+            return Result<List<InstallmentChargesReportItem>, string>.Ok(results);
         }
     }
 }

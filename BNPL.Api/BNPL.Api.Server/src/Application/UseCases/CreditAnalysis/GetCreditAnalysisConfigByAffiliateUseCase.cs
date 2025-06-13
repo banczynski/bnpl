@@ -1,21 +1,20 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
 {
-    public sealed class GetCreditAnalysisConfigByAffiliateUseCase(ICreditAnalysisConfigurationRepository repository)
+    public sealed class GetCreditAnalysisConfigByAffiliateUseCase(ICreditAnalysisConfigurationRepository creditAnalysisRepository)
     {
-        public async Task<ServiceResult<CreditAnalysisConfigDto>> ExecuteAsync(Guid affiliateId)
+        public async Task<Result<CreditAnalysisConfigDto, string>> ExecuteAsync(Guid affiliateId)
         {
-            var entity = await repository.GetByAffiliateAsync(affiliateId)
-                ?? throw new InvalidOperationException("Configuration not found.");
+            var entity = await creditAnalysisRepository.GetByAffiliateAsync(affiliateId);
 
-            return new ServiceResult<CreditAnalysisConfigDto>(
-                entity.ToDto(),
-                ["Affiliate credit analysis configuration retrieved."]
-            );
+            if (entity is null)
+                return Result<CreditAnalysisConfigDto, string>.Fail("Configuration not found.");
+
+            return Result<CreditAnalysisConfigDto, string>.Ok(entity.ToDto());
         }
     }
 }

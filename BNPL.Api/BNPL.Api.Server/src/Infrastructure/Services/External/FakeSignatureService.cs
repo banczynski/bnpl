@@ -1,21 +1,42 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Signature;
-using BNPL.Api.Server.src.Application.Services.External;
-using BNPL.Api.Server.src.Domain.Enums;
+﻿using BNPL.Api.Server.src.Application.Abstractions.External;
+using BNPL.Api.Server.src.Application.DTOs.Signature;
+using System.Collections.Concurrent;
 
 namespace BNPL.Api.Server.src.Infrastructure.Services.External
 {
-    // TODO
     public sealed class FakeSignatureService : ISignatureService
     {
-        public Task<Uri> GenerateSignatureLinkAsync(SignatureRequest request)
+        private static readonly ConcurrentDictionary<Guid, (string Token, string SentTo, DateTime ExpiresAt)> _store = new();
+
+        private const int ExpirationMinutes = 5;
+
+        public Task<SignatureTokenResponse> GenerateSignatureTokenAsync(Guid proposalId, string customerDestination)
         {
-            var fakeUrl = $"https://signature.example.com/proposals/{request.ProposalId}";
-            return Task.FromResult(new Uri(fakeUrl));
+            var token = new Random().Next(100_000, 999_999).ToString(); 
+            var expiresAt = DateTime.UtcNow.AddMinutes(ExpirationMinutes);
+
+            _store[proposalId] = (token, customerDestination, expiresAt);
+
+            return Task.FromResult(new SignatureTokenResponse(
+                customerDestination,
+                expiresAt
+            ));
         }
 
-        public Task<SignatureStatus> CheckStatusAsync(string externalSignatureId)
+        public Task<bool> ValidateSignatureTokenAsync(Guid proposalId, string sentTo)
         {
-            return Task.FromResult(SignatureStatus.Signed);
+            if (!_store.TryGetValue(proposalId, out var entry))
+                return Task.FromResult(false);
+
+            var (_, expectedDestination, expiresAt) = entry;
+
+            var isValid = string.Equals(expectedDestination, sentTo, StringComparison.OrdinalIgnoreCase)
+                          && DateTime.UtcNow <= expiresAt;
+
+            if (isValid)
+                _store.TryRemove(proposalId, out _);
+
+            return Task.FromResult(isValid);
         }
     }
 }

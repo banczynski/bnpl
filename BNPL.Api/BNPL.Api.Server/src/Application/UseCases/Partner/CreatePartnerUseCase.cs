@@ -1,26 +1,24 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.Partner;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Partner
 {
     public sealed class CreatePartnerUseCase(
-        IPartnerRepository repository,
+        IPartnerRepository partnerRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<CreatePartnerResponse>> ExecuteAsync(CreatePartnerRequest request)
+        public async Task<Result<CreatePartnerResponse, string[]>> ExecuteAsync(CreatePartnerRequest request)
         {
-            var now = DateTime.UtcNow;
-            var id = Guid.NewGuid();
+            var entity = request.ToEntity(userContext.GetRequiredUserId());
+            await partnerRepository.InsertAsync(entity);
 
-            var entity = request.ToEntity(id, now, userContext.UserId);
-            await repository.InsertAsync(entity);
-
-            var response = new CreatePartnerResponse(entity.Id);
-            return new ServiceResult<CreatePartnerResponse>(response, ["Partner created successfully."]);
+            var response = new CreatePartnerResponse(entity.Code);
+            return Result<CreatePartnerResponse, string[]>.Ok(response);
         }
     }
 }

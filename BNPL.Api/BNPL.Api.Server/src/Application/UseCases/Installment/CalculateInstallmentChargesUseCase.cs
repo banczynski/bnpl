@@ -1,20 +1,22 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Installment;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Business;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.DTOs.Installment;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Installment
 {
     public sealed class CalculateInstallmentChargesUseCase(
-        IInstallmentRepository repository,
+        IInstallmentRepository installmentRepository,
         IChargesCalculatorService chargesCalculator,
         IFinancialChargesConfigurationService configService
     )
     {
-        public async Task<ServiceResult<InstallmentChargesResult>> ExecuteAsync(Guid installmentId, DateTime? paymentDate = null)
+        public async Task<Result<InstallmentChargesResult, string>> ExecuteAsync(Guid installmentId, DateTime? paymentDate = null)
         {
-            var entity = await repository.GetByIdAsync(installmentId)
-                ?? throw new InvalidOperationException("Installment not found.");
+            var entity = await installmentRepository.GetByIdAsync(installmentId);
+
+            if (entity is null)
+                return Result<InstallmentChargesResult, string>.Fail("Installment not found.");
 
             var config = await configService.GetEffectiveConfigAsync(entity.PartnerId, entity.AffiliateId);
 
@@ -28,7 +30,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
 
             var result = chargesCalculator.Calculate(input);
 
-            return new ServiceResult<InstallmentChargesResult>(result);
+            return Result<InstallmentChargesResult, string>.Ok(result);
         }
     }
 }

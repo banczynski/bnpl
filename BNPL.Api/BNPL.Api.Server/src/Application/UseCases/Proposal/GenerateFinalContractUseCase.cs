@@ -1,35 +1,35 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Contract;
-using BNPL.Api.Server.src.Application.Repositories;
-using BNPL.Api.Server.src.Application.Services.External;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using BNPL.Api.Server.src.Application.Abstractions.Storage;
+using BNPL.Api.Server.src.Application.DTOs.Contract;
 using BNPL.Api.Server.src.Domain.Enums;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Proposal
 {
     public sealed class GenerateFinalContractUseCase(
-        IProposalRepository repository,
+        IProposalRepository proposalRepository,
         IPdfContractService pdfContractService
     )
     {
-        public async Task<ServiceResult<Uri>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<Uri, string>> ExecuteAsync(Guid proposalId)
         {
-            var proposal = await repository.GetByIdAsync(proposalId)
-                ?? throw new InvalidOperationException("Proposal not found.");
+            var proposal = await proposalRepository.GetByIdAsync(proposalId);
+            if (proposal is null)
+                return Result<Uri, string>.Fail("Proposal not found.");
 
-            if (proposal.Status != ProposalStatus.Signed)
-                throw new InvalidOperationException("Proposal must be signed to generate the contract.");
+            if (proposal.Status != ProposalStatus.Active)
+                return Result<Uri, string>.Fail("Proposal must be formalized to generate the contract.");
 
-            // TODO
             var url = await pdfContractService.GenerateFinalDocumentAsync(new ContractGenerationRequest(
-                ProposalId: proposal.Id,
+                ProposalId: proposal.Code,
                 CustomerTaxId: proposal.CustomerTaxId,
-                Amount: proposal.ApprovedAmount,
-                Installments: proposal.Installments,
+                Amount: proposal.TotalWithCharges,
+                Installments: proposal.Term,
                 MonthlyInterestRate: proposal.MonthlyInterestRate,
                 SignedAt: proposal.UpdatedAt
             ));
 
-            return new ServiceResult<Uri>(url, ["Final contract generated successfully."]);
+            return Result<Uri, string>.Ok(url);
         }
     }
 }

@@ -1,25 +1,28 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.Kyc;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
     public sealed class UpdateKycUseCase(
-        IKycRepository repository,
+        IKycRepository kycRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid customerId, UpdateKycRequest request)
+        public async Task<Result<KycDto, string>> ExecuteAsync(Guid customerId, UpdateKycRequest request)
         {
-            var entity = await repository.GetByCustomerIdAsync(customerId)
-                ?? throw new InvalidOperationException("KYC data not found.");
+            var entity = await kycRepository.GetByCustomerIdAsync(customerId);
 
-            entity.UpdateEntity(request, DateTime.UtcNow, userContext.UserId);
-            await repository.UpdateAsync(entity);
+            if (entity is null)
+                return Result<KycDto, string>.Fail("KYC data not found.");
 
-            return new ServiceResult<string>("KYC data updated.");
+            entity.UpdateEntity(request, DateTime.UtcNow, userContext.GetRequiredUserId());
+            await kycRepository.UpdateAsync(entity);
+
+            return Result<KycDto, string>.Ok(entity.ToDto());
         }
     }
 }

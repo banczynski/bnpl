@@ -1,27 +1,30 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using Core.Context.Interfaces;
 using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using Core.Context.Extensions;
 using Core.Models;
+using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
 {
     public sealed class UpdateCreditAnalysisConfigUseCase(
-        ICreditAnalysisConfigurationRepository repository,
+        ICreditAnalysisConfigurationRepository creditAnalysisRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid partnerId, Guid? affiliateId, UpdateCreditAnalysisConfigRequest request)
+        public async Task<Result<CreditAnalysisConfigDto, string>> ExecuteAsync(Guid partnerId, Guid? affiliateId, UpdateCreditAnalysisConfigRequest request)
         {
             var entity = (affiliateId is not null
-                ? await repository.GetByAffiliateAsync(affiliateId.Value)
-                : await repository.GetByPartnerAsync(partnerId)) 
-                ?? throw new InvalidOperationException("Configuration not found.");
+                ? await creditAnalysisRepository.GetByAffiliateAsync(affiliateId.Value)
+                : await creditAnalysisRepository.GetByPartnerAsync(partnerId));
 
-            entity.UpdateEntity(request, DateTime.UtcNow, userContext.UserId);
-            await repository.UpdateAsync(entity);
+            if (entity is null)
+                return Result<CreditAnalysisConfigDto, string>.Fail("Configuration not found.");
 
-            return new ServiceResult<string>("Configuration updated.");
+            entity.UpdateEntity(request, DateTime.UtcNow, userContext.GetRequiredUserId());
+            await creditAnalysisRepository.UpdateAsync(entity);
+
+            return Result<CreditAnalysisConfigDto, string>.Ok(entity.ToDto());
         }
     }
 }

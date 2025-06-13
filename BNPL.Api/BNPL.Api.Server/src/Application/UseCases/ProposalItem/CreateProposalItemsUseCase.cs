@@ -1,37 +1,36 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.ProposalItem;
 using BNPL.Api.Server.src.Application.Mappers;
-using BNPL.Api.Server.src.Application.Repositories;
+using BNPL.Api.Server.src.Domain.Enums;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.ProposalItem
 {
     public sealed class CreateProposalItemsUseCase(
-    IProposalRepository proposalRepository,
+        IProposalRepository proposalRepository,
         IProposalItemRepository proposalItemRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid proposalId, CreateProposalItemsRequest request)
+        public async Task<Result<IEnumerable<ProposalItemDto>, string>> ExecuteAsync(Guid proposalId, CreateProposalItemsRequest request)
         {
-            var proposal = await proposalRepository.GetByIdAsync(proposalId)
-                ?? throw new InvalidOperationException("Proposal not found.");
+            var proposal = await proposalRepository.GetByIdAsync(proposalId);
+            if (proposal is null)
+                return Result<IEnumerable<ProposalItemDto>, string>.Fail("Proposal not found.");
 
             if (!proposal.IsActive)
-                throw new InvalidOperationException("Cannot add items to an inactive proposal.");
+                return Result<IEnumerable<ProposalItemDto>, string>.Fail("Cannot add items to an inactive proposal.");
 
-            var existingItems = await proposalItemRepository.GetByProposalIdAsync(proposalId);
-            if (existingItems.Any())
-                throw new InvalidOperationException("Proposal already contains items.");
+            if (proposal.Status is not ProposalStatus.Created)
+                return Result<IEnumerable<ProposalItemDto>, string>.Fail("Proposal is not eligible to add an item.");
 
-            var now = DateTime.UtcNow;
-            var user = userContext.UserId;
-
-            var entities = request.Items.Select(item => item.ToEntity(proposalId, now, user)).ToList();
+            var entities = request.Items.Select(item => item.ToEntity(proposalId, proposal.AffiliateId, userContext.GetRequiredUserId())).ToList();
 
             await proposalItemRepository.InsertManyAsync(entities);
 
-            return new ServiceResult<string>("Proposal items created.");
+            return Result<IEnumerable<ProposalItemDto>, string>.Ok(entities.ToDtoList());
         }
     }
 }

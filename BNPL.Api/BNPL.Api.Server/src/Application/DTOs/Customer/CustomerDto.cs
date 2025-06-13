@@ -11,7 +11,7 @@
         bool IsActive,
         DateTime CreatedAt,
         DateTime UpdatedAt,
-        string CreatedBy,
-        string UpdatedBy
+        Guid CreatedBy,
+        Guid UpdatedBy
     );
 }

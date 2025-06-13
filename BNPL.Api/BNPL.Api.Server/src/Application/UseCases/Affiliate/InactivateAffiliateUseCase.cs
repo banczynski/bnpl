@@ -1,21 +1,25 @@
-﻿using BNPL.Api.Server.src.Application.Context.Interfaces;
-using BNPL.Api.Server.src.Application.Repositories;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Affiliate
 {
     public sealed class InactivateAffiliateUseCase(
-        IAffiliateRepository repository,
+        IAffiliateRepository affiliateRepository,
+        IProposalRepository proposalRepository,
         IUserContext userContext
     )
     {
-        public async Task<ServiceResult<string>> ExecuteAsync(Guid id)
+        public async Task<Result<bool, string>> ExecuteAsync(Guid affiliateId)
         {
-            var now = DateTime.UtcNow;
+            var hasActiveProposals = await proposalRepository.ExistsActiveByAffiliateIdAsync(affiliateId);
+            if (hasActiveProposals)
+                return Result<bool, string>.Fail("Unable to inactivate affiliate with active proposals.");
 
-            await repository.InactivateAsync(id, userContext.UserId, now);
+            await affiliateRepository.InactivateAsync(affiliateId, userContext.GetRequiredUserId());
 
-            return new ServiceResult<string>("Affiliate inactivated successfully.");
+            return Result<bool, string>.Ok(true);
         }
     }
 }

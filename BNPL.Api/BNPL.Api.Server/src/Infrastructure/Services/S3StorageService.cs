@@ -1,6 +1,6 @@
 ﻿using Amazon.S3;
 using Amazon.S3.Model;
-using BNPL.Api.Server.src.Application.Services;
+using BNPL.Api.Server.src.Application.Abstractions.Storage;
 
 namespace BNPL.Api.Server.src.Infrastructure.Services
 {

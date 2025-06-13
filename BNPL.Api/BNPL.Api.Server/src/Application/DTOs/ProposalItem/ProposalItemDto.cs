@@ -1,8 +1,8 @@
 ﻿namespace BNPL.Api.Server.src.Application.DTOs.ProposalItem
 {
     public sealed record ProposalItemDto(
+        Guid Id,
         Guid ProposalId,
-        Guid ProductId,
         string Description,
         decimal Amount,
         Guid AffiliateId,
