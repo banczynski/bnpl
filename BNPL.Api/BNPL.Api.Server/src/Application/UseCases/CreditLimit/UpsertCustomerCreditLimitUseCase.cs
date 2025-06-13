@@ -13,11 +13,11 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
         IUserContext userContext
     )
     {
-        public async Task<Result<bool, string>> ExecuteAsync(CreditLimitUpsertRequest request, IDbTransaction? transaction = null)
+        public async Task<Result<bool, Error>> ExecuteAsync(CreditLimitUpsertRequest request, IDbTransaction? transaction = null)
         {
             var existing = await customerCreditLimitRepository.GetByTaxIdAndAffiliateIdAsync(request.CustomerTaxId, request.AffiliateId, transaction);
-
             var now = DateTime.UtcNow;
+            var userId = userContext.GetRequiredUserId();
 
             if (existing is null)
             {
@@ -31,8 +31,8 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
                     UsedLimit = 0,
                     CreatedAt = now,
                     UpdatedAt = now,
-                    CreatedBy = userContext.GetRequiredUserId(),
-                    UpdatedBy = userContext.GetRequiredUserId(),
+                    CreatedBy = userId,
+                    UpdatedBy = userId,
                     IsActive = true
                 };
 
@@ -42,11 +42,11 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
             {
                 existing.ApprovedLimit = request.ApprovedLimit;
                 existing.UpdatedAt = now;
-                existing.UpdatedBy = userContext.GetRequiredUserId();
+                existing.UpdatedBy = userId;
                 await customerCreditLimitRepository.UpdateAsync(existing, transaction);
             }
 
-            return Result<bool, string>.Ok(true);
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

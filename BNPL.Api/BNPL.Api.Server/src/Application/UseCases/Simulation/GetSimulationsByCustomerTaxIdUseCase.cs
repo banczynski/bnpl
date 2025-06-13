@@ -7,10 +7,10 @@ namespace BNPL.Api.Server.src.Application.UseCases.Simulation
 {
     public sealed class GetSimulationsByCustomerTaxIdUseCase(ISimulationRepository simulationRepository)
     {
-        public async Task<Result<IEnumerable<SimulationDto>, string>> ExecuteAsync(string taxId)
+        public async Task<Result<IEnumerable<SimulationDto>, Error>> ExecuteAsync(string taxId)
         {
             var simulations = await simulationRepository.GetByCustomerTaxIdAsync(taxId);
-            return Result<IEnumerable<SimulationDto>, string>.Ok(simulations.ToDtoList());
+            return Result<IEnumerable<SimulationDto>, Error>.Ok(simulations.ToDtoList());
         }
     }
 }

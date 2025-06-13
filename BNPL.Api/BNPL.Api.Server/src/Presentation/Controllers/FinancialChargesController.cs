@@ -1,4 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.FinancialCharges;
 using BNPL.Api.Server.src.Application.UseCases.FinancialCharges;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -10,37 +11,64 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public sealed class FinancialChargesController(
-        CreateFinancialChargesConfigUseCase createUseCase,
-        UpdateFinancialChargesConfigUseCase updateUseCase,
-        InactivateFinancialChargesConfigUseCase inactivateUseCase,
+        IUseCase<CreateFinancialChargesConfigRequestUseCase, Result<FinancialChargesConfigDto, Error>> createUseCase,
+        IUseCase<UpdateFinancialChargesConfigRequestUseCase, Result<FinancialChargesConfigDto, Error>> updateUseCase,
+        IUseCase<InactivateFinancialChargesConfigRequestUseCase, Result<bool, Error>> inactivateUseCase,
         GetFinancialChargesByPartnerUseCase getByPartnerUseCase,
         GetFinancialChargesByAffiliateUseCase getByAffiliateUseCase
     ) : ControllerBase
     {
         [HttpPost("{partnerId:guid}")]
-        public async Task<ActionResult<Result<FinancialChargesConfigDto, string>>> Create(
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<FinancialChargesConfigDto, Error>>> Create(
             Guid partnerId,
-            [FromQuery] Guid affiliateId,
+            [FromQuery] Guid? affiliateId,
             [FromBody] CreateFinancialChargesConfigRequest request)
-            => Ok(await createUseCase.ExecuteAsync(partnerId, affiliateId, request));
+        {
+            var useCaseRequest = new CreateFinancialChargesConfigRequestUseCase(partnerId, affiliateId, request);
+            var result = await createUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpPut("{partnerId:guid}")]
-        public async Task<ActionResult<Result<FinancialChargesConfigDto, string>>> Update(
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<FinancialChargesConfigDto, Error>>> Update(
             Guid partnerId,
             [FromQuery] Guid? affiliateId,
             [FromBody] UpdateFinancialChargesConfigRequest request)
-            => Ok(await updateUseCase.ExecuteAsync(partnerId, affiliateId, request));
+        {
+            var useCaseRequest = new UpdateFinancialChargesConfigRequestUseCase(partnerId, affiliateId, request);
+            var result = await updateUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpDelete("{partnerId:guid}")]
-        public async Task<ActionResult<Result<string, string>>> Inactivate(Guid partnerId, [FromQuery] Guid? affiliateId)
-            => Ok(await inactivateUseCase.ExecuteAsync(partnerId, affiliateId));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> Inactivate(Guid partnerId, [FromQuery] Guid? affiliateId)
+        {
+            var useCaseRequest = new InactivateFinancialChargesConfigRequestUseCase(partnerId, affiliateId);
+            var result = await inactivateUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpGet("by-partner/{partnerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<FinancialChargesConfigDto>, string>>> GetByPartner(Guid partnerId)
-            => Ok(await getByPartnerUseCase.ExecuteAsync(partnerId));
+        [ProducesResponseType(typeof(Result<IEnumerable<FinancialChargesConfigDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<FinancialChargesConfigDto>, Error>>> GetByPartner(Guid partnerId)
+        {
+            var result = await getByPartnerUseCase.ExecuteAsync(partnerId);
+            return Ok(result);
+        }
 
         [HttpGet("by-affiliate/{affiliateId:guid}")]
-        public async Task<ActionResult<Result<FinancialChargesConfigDto, string>>> GetByAffiliate(Guid affiliateId)
-            => Ok(await getByAffiliateUseCase.ExecuteAsync(affiliateId));
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<FinancialChargesConfigDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<FinancialChargesConfigDto, Error>>> GetByAffiliate(Guid affiliateId)
+        {
+            var result = await getByAffiliateUseCase.ExecuteAsync(affiliateId);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
     }
 }

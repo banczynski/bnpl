@@ -1,4 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.UseCases.Payment;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.UseCases.Payment;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,16 +10,20 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public sealed class PaymentController(
-        PayInvoiceUseCase payInvoiceUseCase) : ControllerBase
+        IUseCase<PayInvoiceRequestUseCase, Result<bool, Error>> payInvoiceUseCase
+    ) : ControllerBase
     {
         [HttpPost("pay-invoice/{invoiceId:guid}")]
-        public async Task<ActionResult<Result<string, string[]>>> PayInvoice(
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> PayInvoice(
             Guid invoiceId,
             [FromQuery] decimal paidAmount,
             [FromQuery] DateTime? paymentDate)
         {
-            var result = await payInvoiceUseCase.ExecuteAsync(invoiceId, paidAmount, paymentDate);
-            return Ok(result);
+            var useCaseRequest = new PayInvoiceRequestUseCase(invoiceId, paidAmount, paymentDate);
+            var result = await payInvoiceUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
     }
 }

@@ -1,114 +1,106 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
-using BNPL.Api.Server.src.Application.Abstractions.Repositories;
-using BNPL.Api.Server.src.Application.DTOs.Installment;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.UseCases.CreditLimit;
 using BNPL.Api.Server.src.Application.UseCases.Installment;
 using BNPL.Api.Server.src.Domain.Enums;
 using Core.Context.Extensions;
 using Core.Context.Interfaces;
 using Core.Models;
+using Core.Persistence.Interfaces;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Payment
 {
+    public sealed record PayInvoiceRequestUseCase(Guid InvoiceId, decimal PaidAmount, DateTime? PaymentDate = null);
+
     public sealed class PayInvoiceUseCase(
-    IInvoiceRepository invoiceRepository,
-    IInstallmentRepository installmentRepository,
-    IProposalRepository proposalRepository,
-    AdjustCustomerCreditLimitUseCase adjustCreditLimitUseCase,
-    CalculateInstallmentChargesUseCase calculateChargesUseCase,
-    IUnitOfWork unitOfWork,
-    IUserContext userContext
-)
+        IInvoiceRepository invoiceRepository,
+        IInstallmentRepository installmentRepository,
+        IProposalRepository proposalRepository,
+        AdjustCustomerCreditLimitUseCase adjustCreditLimitUseCase,
+        CalculateInstallmentChargesUseCase calculateChargesUseCase,
+        IUnitOfWork unitOfWork,
+        IUserContext userContext
+    ) : IUseCase<PayInvoiceRequestUseCase, Result<bool, Error>>
     {
-        public async Task<Result<bool, string>> ExecuteAsync(Guid invoiceId, decimal paidAmount, DateTime? paymentDate = null)
+        public async Task<Result<bool, Error>> ExecuteAsync(PayInvoiceRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var (invoiceId, paidAmount, paymentDate) = request;
+            var now = DateTime.UtcNow;
+            var userId = userContext.GetRequiredUserId();
 
-            try
+            var invoice = await invoiceRepository.GetByIdAsync(invoiceId, unitOfWork.Transaction);
+            if (invoice is null)
+                return Result<bool, Error>.Fail(DomainErrors.Invoice.NotFound);
+
+            if (invoice.Status == InvoiceStatus.Paid)
+                return Result<bool, Error>.Fail(DomainErrors.Invoice.AlreadyPaid);
+
+            var installments = (await installmentRepository.GetByInvoiceIdAsync(invoiceId, unitOfWork.Transaction)).ToList();
+            if (installments.Any(i => i.Status == InstallmentStatus.Paid))
+                return Result<bool, Error>.Fail(DomainErrors.Installment.AlreadyPaid);
+
+            var proposalIds = installments
+                .Where(i => i.ProposalId.HasValue)
+                .Select(i => i.ProposalId!.Value)
+                .Distinct()
+                .ToList();
+
+            foreach (var proposalId in proposalIds)
             {
-                scope.Begin();
+                var proposal = await proposalRepository.GetByIdAsync(proposalId, unitOfWork.Transaction);
+                if (proposal is null)
+                    return Result<bool, Error>.Fail(DomainErrors.Proposal.NotFound);
+                if (proposal.Status != ProposalStatus.Active)
+                    return Result<bool, Error>.Fail(DomainErrors.Proposal.PaymentsNotAllowed);
+            }
 
-                var now = DateTime.UtcNow;
-                var userId = userContext.GetRequiredUserId();
+            decimal totalDue = 0m;
+            foreach (var installment in installments)
+            {
+                var chargesResult = await calculateChargesUseCase.ExecuteAsync(installment.Code, paymentDate);
+                if (chargesResult.TryGetError(out var error))
+                    return Result<bool, Error>.Fail(error!);
 
-                var invoice = await invoiceRepository.GetByIdAsync(invoiceId, scope.Transaction);
-                if (invoice is null)
-                    return Result<bool, string>.Fail("Invoice not found.");
+                totalDue += chargesResult.TryGetSuccess(out var value) ? value.TotalWithCharges : 0m;
+            }
 
-                if (invoice.Status == InvoiceStatus.Paid)
-                    return Result<bool, string>.Fail("Invoice already paid.");
+            if (paidAmount < totalDue)
+                return Result<bool, Error>.Fail(DomainErrors.Payment.AmountLessThanDue);
 
-                var installments = await installmentRepository.GetByInvoiceIdAsync(invoiceId, scope.Transaction);
-                if (installments.Any(i => i.Status == InstallmentStatus.Paid))
-                    return Result<bool, string>.Fail("Some installments already paid.");
+            invoice.MarkAsPaid(now, userId);
+            await invoiceRepository.UpdateAsync(invoice, unitOfWork.Transaction);
 
-                var proposalIds = installments
-                    .Where(i => i.ProposalId.HasValue)
-                    .Select(i => i.ProposalId!.Value)
-                    .Distinct()
-                    .ToList();
+            foreach (var installment in installments)
+            {
+                installment.MarkAsPaid(now, userId);
+            }
+            await installmentRepository.UpdateManyAsync(installments, unitOfWork.Transaction);
 
-                foreach (var proposalId in proposalIds)
+            foreach (var proposalId in proposalIds)
+            {
+                var all = await installmentRepository.GetByProposalIdAsync(proposalId, unitOfWork.Transaction);
+                if (all.All(i => i.Status == InstallmentStatus.Paid))
                 {
-                    var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
-                    if (proposal is null)
-                        return Result<bool, string>.Fail("Associated proposal not found.");
-
-                    if (proposal.Status != ProposalStatus.Active)
-                        return Result<bool, string>.Fail("Payments are only allowed for active proposals.");
-                }
-
-                decimal totalDue = 0m;
-                foreach (var installment in installments)
-                {
-                    var chargesResult = await calculateChargesUseCase.ExecuteAsync(installment.Code, paymentDate);
-                    if (chargesResult is Result<InstallmentChargesResult, string>.Failure fail)
-                        return Result<bool, string>.Fail(fail.Error);
-
-                    totalDue += chargesResult.TryGetSuccess(out var value) ? value.TotalWithCharges : 0m;
-                }
-
-                if (paidAmount < totalDue)
-                    return Result<bool, string>.Fail("Paid amount is less than total due with penalties.");
-
-                invoice.MarkAsPaid(now, userId);
-                await invoiceRepository.UpdateAsync(invoice, scope.Transaction);
-
-                foreach (var installment in installments)
-                {
-                    installment.MarkAsPaid(now, userId);
-                }
-                await installmentRepository.UpdateManyAsync(installments, scope.Transaction);
-
-                foreach (var proposalId in proposalIds)
-                {
-                    var all = await installmentRepository.GetByProposalIdAsync(proposalId, scope.Transaction);
-                    if (all.All(i => i.Status == InstallmentStatus.Paid))
+                    var proposal = await proposalRepository.GetByIdAsync(proposalId, unitOfWork.Transaction);
+                    if (proposal is not null && proposal.Status != ProposalStatus.Finalized)
                     {
-                        var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
-                        if (proposal is not null && proposal.Status != ProposalStatus.Finalized)
-                        {
-                            proposal.MarkAsFinalized(now, userId);
-                            await proposalRepository.UpdateAsync(proposal, scope.Transaction);
-                        }
+                        proposal.MarkAsFinalized(now, userId);
+                        await proposalRepository.UpdateAsync(proposal, unitOfWork.Transaction);
                     }
                 }
-
-                await adjustCreditLimitUseCase.ExecuteAsync(
-                    invoice.CustomerTaxId,
-                    invoice.AffiliateId,
-                    invoice.TotalAmount,
-                    increase: true
-                );
-
-                scope.Commit();
-                return Result<bool, string>.Ok(true);
             }
-            catch
-            {
-                scope.Rollback();
-                throw;
-            }
+
+            var creditLimitResult = await adjustCreditLimitUseCase.ExecuteAsync(
+                invoice.CustomerTaxId,
+                invoice.AffiliateId,
+                invoice.TotalAmount,
+                increase: true,
+                unitOfWork.Transaction
+            );
+
+            if (creditLimitResult.TryGetError(out var creditError))
+                return Result<bool, Error>.Fail(creditError!);
+
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

@@ -14,7 +14,7 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
         private readonly string clientId = config["AWS:Cognito:ClientId"]
             ?? throw new InvalidOperationException("Cognito ClientId not configured.");
 
-        public async Task<Result<LoginResponse, string>> AuthenticateAsync(LoginRequest request)
+        public async Task<Result<LoginResponse, Error>> AuthenticateAsync(LoginRequest request)
         {
             var authRequest = new InitiateAuthRequest
             {
@@ -30,10 +30,9 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
             try
             {
                 var response = await client.InitiateAuthAsync(authRequest);
-
                 if (response.ChallengeName == ChallengeNameType.NEW_PASSWORD_REQUIRED)
                 {
-                    return Result<LoginResponse, string>.Ok(new LoginResponse
+                    return Result<LoginResponse, Error>.Ok(new LoginResponse
                     {
                         ChallengeRequired = true,
                         ChallengeName = response.ChallengeName.Value,
@@ -43,9 +42,9 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
 
                 var auth = response.AuthenticationResult;
                 if (auth is null)
-                    return Result<LoginResponse, string>.Fail("Authentication failed: no token returned.");
+                    return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.AuthenticationFailed);
 
-                return Result<LoginResponse, string>.Ok(new LoginResponse
+                return Result<LoginResponse, Error>.Ok(new LoginResponse
                 {
                     AccessToken = auth.AccessToken,
                     RefreshToken = auth.RefreshToken,
@@ -55,19 +54,19 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
             }
             catch (NotAuthorizedException)
             {
-                return Result<LoginResponse, string>.Fail("Invalid username or password.");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.InvalidCredentials);
             }
             catch (UserNotConfirmedException)
             {
-                return Result<LoginResponse, string>.Fail("User not confirmed.");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.UserNotConfirmed);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return Result<LoginResponse, string>.Fail($"Authentication error: {ex.Message}");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.AuthenticationFailed);
             }
         }
 
-        public async Task<Result<LoginResponse, string>> RefreshTokenAsync(RefreshTokenRequest request)
+        public async Task<Result<LoginResponse, Error>> RefreshTokenAsync(RefreshTokenRequest request)
         {
             var refreshRequest = new InitiateAuthRequest
             {
@@ -82,25 +81,25 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
             try
             {
                 var response = await client.InitiateAuthAsync(refreshRequest);
-                return Result<LoginResponse, string>.Ok(new LoginResponse
+                return Result<LoginResponse, Error>.Ok(new LoginResponse
                 {
                     AccessToken = response.AuthenticationResult.AccessToken,
                     IdToken = response.AuthenticationResult.IdToken,
                     ExpiresIn = response.AuthenticationResult.ExpiresIn.GetValueOrDefault(),
-                    RefreshToken = request.RefreshToken 
+                    RefreshToken = request.RefreshToken
                 });
             }
             catch (NotAuthorizedException)
             {
-                return Result<LoginResponse, string>.Fail("Invalid refresh token.");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.InvalidRefreshToken);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return Result<LoginResponse, string>.Fail($"Refresh token error: {ex.Message}");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.InvalidRefreshToken);
             }
         }
 
-        public async Task<Result<LoginResponse, string>> CompleteNewPasswordChallengeAsync(CompleteChallengeRequest request)
+        public async Task<Result<LoginResponse, Error>> CompleteNewPasswordChallengeAsync(CompleteChallengeRequest request)
         {
             try
             {
@@ -120,9 +119,9 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
                 var auth = response.AuthenticationResult;
 
                 if (auth is null)
-                    return Result<LoginResponse, string>.Fail("Challenge response succeeded, but no tokens were returned.");
+                    return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.ChallengeFailed);
 
-                return Result<LoginResponse, string>.Ok(new LoginResponse
+                return Result<LoginResponse, Error>.Ok(new LoginResponse
                 {
                     AccessToken = auth.AccessToken,
                     RefreshToken = auth.RefreshToken,
@@ -130,9 +129,9 @@ namespace BNPL.Api.Server.src.Infrastructure.Services
                     ExpiresIn = auth.ExpiresIn.GetValueOrDefault()
                 });
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return Result<LoginResponse, string>.Fail($"Error completing challenge: {ex.Message}");
+                return Result<LoginResponse, Error>.Fail(DomainErrors.Auth.ChallengeFailed);
             }
         }
     }

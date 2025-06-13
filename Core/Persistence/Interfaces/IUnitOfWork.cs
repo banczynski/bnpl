@@ -1,6 +1,6 @@
 ﻿using System.Data;
 
-namespace BNPL.Api.Server.src.Application.Abstractions.Persistence
+namespace Core.Persistence.Interfaces
 {
     public interface IUnitOfWork : IDisposable
     {

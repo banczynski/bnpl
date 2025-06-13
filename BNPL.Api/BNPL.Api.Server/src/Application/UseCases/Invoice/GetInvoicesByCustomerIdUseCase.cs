@@ -7,10 +7,10 @@ namespace BNPL.Api.Server.src.Application.UseCases.Invoice
 {
     public sealed class GetInvoicesByCustomerIdUseCase(IInvoiceRepository invoiceRepository)
     {
-        public async Task<Result<IEnumerable<InvoiceDto>, string>> ExecuteAsync(Guid customerId, bool onlyActive = true)
+        public async Task<Result<IEnumerable<InvoiceDto>, Error>> ExecuteAsync(Guid customerId)
         {
-            var invoices = await invoiceRepository.GetByCustomerIdAsync(customerId, onlyActive);
-            return Result<IEnumerable<InvoiceDto>, string>.Ok(invoices.Select(i => i.ToDto()));
+            var invoices = await invoiceRepository.GetActivesByCustomerIdAsync(customerId);
+            return Result<IEnumerable<InvoiceDto>, Error>.Ok(invoices.Select(i => i.ToDto()));
         }
     }
 }

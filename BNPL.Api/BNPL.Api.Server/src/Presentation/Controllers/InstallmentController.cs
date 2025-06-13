@@ -1,4 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Installment;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.Installment;
 using BNPL.Api.Server.src.Application.UseCases.Installment;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -14,28 +15,50 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
         GetInstallmentsByCustomerUseCase getByCustomerUseCase,
         CalculateInstallmentChargesUseCase calculateChargesUseCase,
         CalculateInstallmentPenaltiesBatchUseCase calculatePenaltiesBatchUseCase,
-        GenerateInstallmentsUseCase generateInstallmentsUseCase
+        IUseCase<GenerateInstallmentsRequestUseCase, Result<IEnumerable<InstallmentDto>, Error>> generateInstallmentsUseCase
     ) : ControllerBase
     {
         [HttpPost("generate/{proposalId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, string>>> GenerateInstallments(Guid proposalId)
-            => Ok(await generateInstallmentsUseCase.ExecuteAsync(proposalId));
+        [ProducesResponseType(typeof(Result<IEnumerable<InstallmentDto>, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<IEnumerable<InstallmentDto>, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, Error>>> GenerateInstallments(Guid proposalId)
+        {
+            var useCaseRequest = new GenerateInstallmentsRequestUseCase(proposalId);
+            var result = await generateInstallmentsUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpGet("by-proposal/{proposalId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, string>>> GetByProposal(Guid proposalId)
-            => Ok(await getByProposalUseCase.ExecuteAsync(proposalId));
+        [ProducesResponseType(typeof(Result<IEnumerable<InstallmentDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, Error>>> GetByProposal(Guid proposalId)
+        {
+            var result = await getByProposalUseCase.ExecuteAsync(proposalId);
+            return Ok(result);
+        }
 
         [HttpGet("by-customer/{customerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, string>>> GetByCustomer(Guid customerId)
-            => Ok(await getByCustomerUseCase.ExecuteAsync(customerId));
+        [ProducesResponseType(typeof(Result<IEnumerable<InstallmentDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<InstallmentDto>, Error>>> GetByCustomer(Guid customerId)
+        {
+            var result = await getByCustomerUseCase.ExecuteAsync(customerId);
+            return Ok(result);
+        }
 
         [HttpGet("{id:guid}/charges")]
-        public async Task<ActionResult<Result<InstallmentChargesResult, string>>> GetCharges(Guid id, [FromQuery] DateTime? paymentDate = null)
-            => Ok(await calculateChargesUseCase.ExecuteAsync(id, paymentDate));
+        [ProducesResponseType(typeof(Result<InstallmentChargesResult, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<InstallmentChargesResult, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<InstallmentChargesResult, Error>>> GetCharges(Guid id, [FromQuery] DateTime? paymentDate = null)
+        {
+            var result = await calculateChargesUseCase.ExecuteAsync(id, paymentDate);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
-        // TODO Esse processo deverá ficar numa lambda
         [HttpGet("penalties")]
-        public async Task<ActionResult<Result<List<InstallmentChargesReportItem>, string>>> GetBatchPenalties([FromQuery] DateTime? referenceDate = null)
-            => Ok(await calculatePenaltiesBatchUseCase.ExecuteAsync(referenceDate));
+        [ProducesResponseType(typeof(Result<List<InstallmentChargesReportItem>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<List<InstallmentChargesReportItem>, Error>>> GetBatchPenalties([FromQuery] DateTime? referenceDate = null)
+        {
+            var result = await calculatePenaltiesBatchUseCase.ExecuteAsync(referenceDate);
+            return Ok(result);
+        }
     }
 }

@@ -7,14 +7,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
 {
     public sealed class GetCreditAnalysisConfigByAffiliateUseCase(ICreditAnalysisConfigurationRepository creditAnalysisRepository)
     {
-        public async Task<Result<CreditAnalysisConfigDto, string>> ExecuteAsync(Guid affiliateId)
+        public async Task<Result<CreditAnalysisConfigDto, Error>> ExecuteAsync(Guid affiliateId)
         {
             var entity = await creditAnalysisRepository.GetByAffiliateAsync(affiliateId);
 
             if (entity is null)
-                return Result<CreditAnalysisConfigDto, string>.Fail("Configuration not found.");
+                return Result<CreditAnalysisConfigDto, Error>.Fail(DomainErrors.CreditAnalysis.ConfigNotFound);
 
-            return Result<CreditAnalysisConfigDto, string>.Ok(entity.ToDto());
+            return Result<CreditAnalysisConfigDto, Error>.Ok(entity.ToDto());
         }
     }
 }

@@ -1,5 +1,5 @@
 ﻿using BNPL.Api.Server.src.Application.Abstractions.External;
-using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+using Core.Persistence.Interfaces;
 using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.Signature;
 using BNPL.Api.Server.src.Domain.Entities;
@@ -10,6 +10,8 @@ using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Signature
 {
+    public sealed record GenerateSignatureTokenRequestUseCase(Guid ProposalId);
+
     public sealed class GenerateSignatureTokenUseCase(
         IProposalRepository proposalRepository,
         ICustomerRepository customerRepository,
@@ -18,58 +20,47 @@ namespace BNPL.Api.Server.src.Application.UseCases.Signature
         ISignatureService signatureService,
         IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<GenerateSignatureTokenRequestUseCase, Result<SignatureTokenResponse, Error>>
     {
-        public async Task<Result<SignatureTokenResponse, string>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<SignatureTokenResponse, Error>> ExecuteAsync(GenerateSignatureTokenRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var proposal = await proposalRepository.GetByIdAsync(request.ProposalId, unitOfWork.Transaction);
+            if (proposal is null)
+                return Result<SignatureTokenResponse, Error>.Fail(DomainErrors.Proposal.NotFound);
 
-            try
+            if (proposal.Status is not (ProposalStatus.Approved or ProposalStatus.AwaitingSignature))
+                return Result<SignatureTokenResponse, Error>.Fail(DomainErrors.Proposal.NotEligibleForSignature);
+
+            var customer = await customerRepository.GetByIdAsync(proposal.CustomerId, unitOfWork.Transaction);
+            if (customer is null)
+                return Result<SignatureTokenResponse, Error>.Fail(DomainErrors.Customer.NotFound);
+
+            var kyc = await kycRepository.GetByCustomerIdAsync(proposal.CustomerId, unitOfWork.Transaction);
+            if (kyc is null || !kyc.OcrValidated || !kyc.FaceMatchValidated)
+                return Result<SignatureTokenResponse, Error>.Fail(DomainErrors.Kyc.NotCompleted);
+
+            var userId = userContext.GetRequiredUserId();
+            proposal.MarkAsAwaitingSignature(DateTime.UtcNow, userId);
+            await proposalRepository.UpdateAsync(proposal, unitOfWork.Transaction);
+
+            var tokenResult = await signatureService.GenerateSignatureTokenAsync(request.ProposalId, customer.Phone);
+
+            await proposalSignatureRepository.InsertAsync(new ProposalSignature
             {
-                scope.Begin();
+                Code = Guid.NewGuid(),
+                ProposalId = proposal.Code,
+                ExternalSignatureId = "123456", // TODO
+                ExpiresAt = tokenResult.ExpiresAt,
+                Destination = tokenResult.Destination,
+                Status = SignatureStatus.Pending,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow,
+                CreatedBy = userId,
+                UpdatedBy = userId,
+                IsActive = true
+            }, unitOfWork.Transaction);
 
-                var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
-                if (proposal is null)
-                    return Result<SignatureTokenResponse, string>.Fail("Proposal not found.");
-
-                if (proposal.Status is not (ProposalStatus.Approved or ProposalStatus.AwaitingSignature))
-                    return Result<SignatureTokenResponse, string>.Fail("Proposal is not eligible for signature.");
-
-                var customer = await customerRepository.GetByIdAsync(proposal.CustomerId, scope.Transaction);
-                if (customer is null)
-                    return Result<SignatureTokenResponse, string>.Fail("Customer not found.");
-
-                var kyc = await kycRepository.GetByCustomerIdAsync(proposal.CustomerId, scope.Transaction);
-                if (kyc is null || !kyc.OcrValidated || !kyc.FaceMatchValidated)
-                    return Result<SignatureTokenResponse, string>.Fail("Customer has not completed identity validation.");
-
-                proposal.MarkAsAwaitingSignature(DateTime.UtcNow, userContext.GetRequiredUserId());
-                await proposalRepository.UpdateAsync(proposal, scope.Transaction);
-
-                var tokenResult = await signatureService.GenerateSignatureTokenAsync(proposalId, customer.Phone);
-
-                await proposalSignatureRepository.InsertAsync(new ProposalSignature
-                {
-                    Code = Guid.NewGuid(),
-                    ProposalId = proposal.Code,
-                    ExpiresAt = tokenResult.ExpiresAt,
-                    Destination = tokenResult.Destination,
-                    Status = SignatureStatus.Pending,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow,
-                    CreatedBy = userContext.GetRequiredUserId(),
-                    UpdatedBy = userContext.GetRequiredUserId()
-                }, scope.Transaction);
-
-                scope.Commit();
-
-                return Result<SignatureTokenResponse, string>.Ok(tokenResult);
-            }
-            catch
-            {
-                scope.Rollback();
-                throw;
-            }
+            return Result<SignatureTokenResponse, Error>.Ok(tokenResult);
         }
     }
 }

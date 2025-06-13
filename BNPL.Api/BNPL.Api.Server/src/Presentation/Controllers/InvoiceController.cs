@@ -1,6 +1,6 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Invoice;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.Invoice;
 using BNPL.Api.Server.src.Application.UseCases.Invoice;
-using BNPL.Api.Server.src.Domain.Entities;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,40 +11,70 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public sealed class InvoiceController(
-        CreateInvoiceUseCase createUseCase,
-        GenerateInvoiceBatchUseCase generateBatchUseCase,
-        MarkOverdueInvoicesUseCase markOverdueUseCase,
+        IUseCase<CreateInvoiceRequestUseCase, Result<IEnumerable<CreateInvoiceResponse>, Error>> createUseCase,
+        IUseCase<GenerateInvoiceBatchRequestUseCase, Result<List<InvoiceDto>, Error>> generateBatchUseCase,
+        IUseCase<MarkOverdueInvoicesRequestUseCase, Result<int, Error>> markOverdueUseCase,
         GetInvoiceByIdUseCase getByIdUseCase,
         GetInvoicesByCustomerIdUseCase getByCustomerUseCase,
         GenerateInvoicePaymentLinkUseCase generatePaymentLinkUseCase
     ) : ControllerBase
     {
         [HttpPost("generate/{customerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<CreateInvoiceResponse>, string>>> Create(
+        [ProducesResponseType(typeof(Result<IEnumerable<CreateInvoiceResponse>, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<IEnumerable<CreateInvoiceResponse>, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<IEnumerable<CreateInvoiceResponse>, Error>>> Create(
             Guid customerId,
             [FromQuery] Guid affiliateId)
-            => Ok(await createUseCase.ExecuteAsync(customerId, affiliateId));
+        {
+            var useCaseRequest = new CreateInvoiceRequestUseCase(customerId, affiliateId);
+            var result = await createUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
-        // TODO Esse processo deverá ficar numa lambda
         [HttpPost("batch")]
-        public async Task<ActionResult<Result<List<InvoiceDto>, string>>> GenerateBatch([FromQuery] int daysAhead = 0)
-            => Ok(await generateBatchUseCase.ExecuteAsync(daysAhead));
+        [ProducesResponseType(typeof(Result<List<InvoiceDto>, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<List<InvoiceDto>, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<List<InvoiceDto>, Error>>> GenerateBatch([FromQuery] int daysAhead = 0)
+        {
+            var useCaseRequest = new GenerateInvoiceBatchRequestUseCase(daysAhead);
+            var result = await generateBatchUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
-        // TODO Esse processo deverá ficar numa lambda
         [HttpPost("mark-overdue")]
-        public async Task<ActionResult<Result<int, string>>> MarkOverdue()
-            => Ok(await markOverdueUseCase.ExecuteAsync());
+        [ProducesResponseType(typeof(Result<int, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<int, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<int, Error>>> MarkOverdue()
+        {
+            var useCaseRequest = new MarkOverdueInvoicesRequestUseCase();
+            var result = await markOverdueUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<Result<InvoiceDto, string>>> GetById(Guid id)
-            => Ok(await getByIdUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<InvoiceDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<InvoiceDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<InvoiceDto, Error>>> GetById(Guid id)
+        {
+            var result = await getByIdUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
 
         [HttpGet("by-customer/{customerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<InvoiceDto>, string>>> GetByCustomer(Guid customerId, [FromQuery] bool onlyActive = true)
-            => Ok(await getByCustomerUseCase.ExecuteAsync(customerId, onlyActive));
+        [ProducesResponseType(typeof(Result<IEnumerable<InvoiceDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<InvoiceDto>, Error>>> GetByCustomer(Guid customerId)
+        {
+            var result = await getByCustomerUseCase.ExecuteAsync(customerId);
+            return Ok(result);
+        }
 
         [HttpPost("{id:guid}/generate-payment-link")]
-        public async Task<ActionResult<Result<GeneratePaymentLinkResponse, string>>> GeneratePaymentLink(Guid id)
-            => Ok(await generatePaymentLinkUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<GeneratePaymentLinkResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<GeneratePaymentLinkResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<GeneratePaymentLinkResponse, Error>>> GeneratePaymentLink(Guid id)
+        {
+            var result = await generatePaymentLinkUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
     }
 }

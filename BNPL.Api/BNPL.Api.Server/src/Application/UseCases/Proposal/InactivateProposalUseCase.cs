@@ -1,4 +1,4 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+﻿using Core.Persistence.Interfaces;
 using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Domain.Enums;
 using Core.Context.Extensions;
@@ -7,6 +7,8 @@ using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Proposal
 {
+    public sealed record InactivateProposalRequestUseCase(Guid ProposalId);
+
     public sealed class InactivateProposalUseCase(
         IProposalRepository proposalRepository,
         IProposalItemRepository itemRepository,
@@ -14,65 +16,53 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
         IInvoiceRepository invoiceRepository,
         IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<InactivateProposalRequestUseCase, Result<bool, Error>>
     {
-        public async Task<Result<bool, string>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<bool, Error>> ExecuteAsync(InactivateProposalRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var now = DateTime.UtcNow;
+            var userId = userContext.GetRequiredUserId();
 
-            try
+            var proposal = await proposalRepository.GetByIdAsync(request.ProposalId, unitOfWork.Transaction);
+            if (proposal is null)
+                return Result<bool, Error>.Fail(DomainErrors.Proposal.NotFound);
+
+            if (proposal.Status is ProposalStatus.Active)
+                return Result<bool, Error>.Fail(DomainErrors.Proposal.InvalidStateForInactivation);
+
+            await proposalRepository.InactivateAsync(request.ProposalId, userId, unitOfWork.Transaction);
+
+            var items = await itemRepository.GetByProposalIdAsync(request.ProposalId, unitOfWork.Transaction);
+            foreach (var item in items)
             {
-                scope.Begin();
-                var now = DateTime.UtcNow;
-
-                var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
-                if (proposal is null)
-                    return Result<bool, string>.Fail("Proposal not found.");
-
-                if (proposal.Status is ProposalStatus.Active)
-                    return Result<bool, string>.Fail("Proposal cannot be inactive in its current state.");
-
-                await proposalRepository.InactivateAsync(proposalId, userContext.GetRequiredUserId(), now, scope.Transaction);
-
-                var items = await itemRepository.GetByProposalIdAsync(proposalId, scope.Transaction);
-                foreach (var item in items)
-                {
-                    item.IsActive = false;
-                    item.UpdatedAt = now;
-                    item.UpdatedBy = userContext.GetRequiredUserId();
-                }
-                await itemRepository.UpdateManyAsync(items, scope.Transaction);
-
-                var installments = await installmentRepository.GetByProposalIdAsync(proposalId, scope.Transaction);
-                foreach (var i in installments)
-                {
-                    if (i.Status == Domain.Enums.InstallmentStatus.Paid)
-                        continue;
-
-                    i.IsActive = false;
-                    i.UpdatedAt = now;
-                    i.UpdatedBy = userContext.GetRequiredUserId();
-                }
-                await installmentRepository.UpdateManyAsync(installments, scope.Transaction);
-
-                var invoices = await invoiceRepository.GetByProposalIdAsync(proposalId, scope.Transaction);
-                foreach (var invoice in invoices)
-                {
-                    invoice.IsActive = false;
-                    invoice.UpdatedAt = now;
-                    invoice.UpdatedBy = userContext.GetRequiredUserId();
-                }
-                await invoiceRepository.UpdateManyAsync(invoices, scope.Transaction);
-
-                scope.Commit();
-
-                return Result<bool, string>.Ok(true);
+                item.IsActive = false;
+                item.UpdatedAt = now;
+                item.UpdatedBy = userId;
             }
-            catch 
+            await itemRepository.UpdateManyAsync(items, unitOfWork.Transaction);
+
+            var installments = await installmentRepository.GetByProposalIdAsync(request.ProposalId, unitOfWork.Transaction);
+            foreach (var i in installments)
             {
-                scope.Rollback();
-                throw;
+                if (i.Status == Domain.Enums.InstallmentStatus.Paid)
+                    continue;
+
+                i.IsActive = false;
+                i.UpdatedAt = now;
+                i.UpdatedBy = userId;
             }
+            await installmentRepository.UpdateManyAsync(installments, unitOfWork.Transaction);
+
+            var invoices = await invoiceRepository.GetByProposalIdAsync(request.ProposalId, unitOfWork.Transaction);
+            foreach (var invoice in invoices)
+            {
+                invoice.IsActive = false;
+                invoice.UpdatedAt = now;
+                invoice.UpdatedBy = userId;
+            }
+            await invoiceRepository.UpdateManyAsync(invoices, unitOfWork.Transaction);
+
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

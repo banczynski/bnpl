@@ -1,7 +1,7 @@
-﻿using Core.Context.Interfaces;
+﻿using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
-using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using System.Data;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
@@ -11,12 +11,11 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
         IUserContext userContext
     )
     {
-        public async Task<Result<bool, string>> ExecuteAsync(string taxId, Guid affiliateId, decimal value, bool increase, IDbTransaction? transaction = null)
+        public async Task<Result<bool, Error>> ExecuteAsync(string taxId, Guid affiliateId, decimal value, bool increase, IDbTransaction? transaction = null)
         {
             var entity = await customerCreditLimitRepository.GetByTaxIdAndAffiliateIdAsync(taxId, affiliateId, transaction);
-
             if (entity is null)
-                return Result<bool, string>.Fail("Customer credit limit not found.");
+                return Result<bool, Error>.Fail(DomainErrors.CreditLimit.NotFound);
 
             var now = DateTime.UtcNow;
             if (increase)
@@ -26,7 +25,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
 
             await customerCreditLimitRepository.UpdateAsync(entity, transaction);
 
-            return Result<bool, string>.Ok(true);
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

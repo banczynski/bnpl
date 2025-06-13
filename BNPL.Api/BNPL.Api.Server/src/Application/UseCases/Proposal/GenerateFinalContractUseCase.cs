@@ -11,14 +11,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
         IPdfContractService pdfContractService
     )
     {
-        public async Task<Result<Uri, string>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<Uri, Error>> ExecuteAsync(Guid proposalId)
         {
             var proposal = await proposalRepository.GetByIdAsync(proposalId);
             if (proposal is null)
-                return Result<Uri, string>.Fail("Proposal not found.");
+                return Result<Uri, Error>.Fail(DomainErrors.Proposal.NotFound);
 
             if (proposal.Status != ProposalStatus.Active)
-                return Result<Uri, string>.Fail("Proposal must be formalized to generate the contract.");
+                return Result<Uri, Error>.Fail(DomainErrors.Proposal.MustBeFormalized);
 
             var url = await pdfContractService.GenerateFinalDocumentAsync(new ContractGenerationRequest(
                 ProposalId: proposal.Code,
@@ -29,7 +29,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
                 SignedAt: proposal.UpdatedAt
             ));
 
-            return Result<Uri, string>.Ok(url);
+            return Result<Uri, Error>.Ok(url);
         }
     }
 }

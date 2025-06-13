@@ -10,11 +10,11 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
         IProposalItemRepository proposalItemRepository
     )
     {
-        public async Task<Result<ProposalWithItemsDto, string>> ExecuteAsync(Guid id)
+        public async Task<Result<ProposalWithItemsDto, Error>> ExecuteAsync(Guid id)
         {
             var proposal = await proposalRepository.GetByIdAsync(id);
             if (proposal is null)
-                return Result<ProposalWithItemsDto, string>.Fail("Proposal not found.");
+                return Result<ProposalWithItemsDto, Error>.Fail(DomainErrors.Proposal.NotFound);
 
             var items = await proposalItemRepository.GetByProposalIdAsync(id);
 
@@ -24,7 +24,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
                 Items = [.. items.Select(x => x.ToDto())]
             };
 
-            return Result<ProposalWithItemsDto, string>.Ok(dto);
+            return Result<ProposalWithItemsDto, Error>.Ok(dto);
         }
     }
 }

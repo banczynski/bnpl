@@ -1,8 +1,8 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+﻿using Core.Persistence.Interfaces;
 using Npgsql;
 using System.Data;
 
-namespace BNPL.Api.Server.src.Infrastructure.Persistence
+namespace Core.Persistence
 {
     public sealed class UnitOfWork : IUnitOfWork
     {

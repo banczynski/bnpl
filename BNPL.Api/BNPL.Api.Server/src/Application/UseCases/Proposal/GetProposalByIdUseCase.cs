@@ -7,12 +7,12 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
 {
     public sealed class GetProposalByIdUseCase(IProposalRepository proposalRepository)
     {
-        public async Task<Result<ProposalDto, string>> ExecuteAsync(Guid id)
+        public async Task<Result<ProposalDto, Error>> ExecuteAsync(Guid id)
         {
             var entity = await proposalRepository.GetByIdAsync(id);
-            return entity is null 
-                ? Result<ProposalDto, string>.Fail("Proposal not found.") 
-                : Result<ProposalDto, string>.Ok(entity.ToDto());
+            return entity is null
+                ? Result<ProposalDto, Error>.Fail(DomainErrors.Proposal.NotFound)
+                : Result<ProposalDto, Error>.Ok(entity.ToDto());
         }
     }
 }

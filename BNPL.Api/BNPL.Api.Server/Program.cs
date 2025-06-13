@@ -8,6 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 SimpleCRUD.SetDialect(SimpleCRUD.Dialect.PostgreSQL);
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 
+builder.Services.Configure<BusinessRulesSettings>(
+    builder.Configuration.GetSection("BusinessRules"));
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpContextAccessor();

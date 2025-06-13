@@ -3,11 +3,9 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Application.Abstractions.Repositories
 {
-    public interface ICreditAnalysisConfigurationRepository
+    public interface ICreditAnalysisConfigurationRepository : IGenericRepository<CreditAnalysisConfiguration>
     {
-        Task InsertAsync(CreditAnalysisConfiguration config, IDbTransaction? transaction = null);
-        Task UpdateAsync(CreditAnalysisConfiguration config, IDbTransaction? transaction = null);
-        Task InactivateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, DateTime updatedAt, IDbTransaction? transaction = null);
+        Task<bool> InactivateByPartnerOrAffiliateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, IDbTransaction? transaction = null);
         Task<CreditAnalysisConfiguration?> GetByAffiliateAsync(Guid affiliateId, IDbTransaction? transaction = null);
         Task<CreditAnalysisConfiguration?> GetByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null);
         Task<IEnumerable<CreditAnalysisConfiguration>> GetAllByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null);

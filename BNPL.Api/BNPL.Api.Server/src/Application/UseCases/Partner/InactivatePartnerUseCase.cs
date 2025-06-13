@@ -2,33 +2,37 @@
 using Core.Context.Extensions;
 using Core.Context.Interfaces;
 using Core.Models;
+using Core.Persistence.Interfaces;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Partner
 {
+    public sealed record InactivatePartnerRequestUseCase(Guid PartnerId);
+
     public sealed class InactivatePartnerUseCase(
         IPartnerRepository partnerRepository,
         IAffiliateRepository affiliateRepository,
         IProposalRepository proposalRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<InactivatePartnerRequestUseCase, Result<bool, Error>>
     {
-        public async Task<Result<bool, string>> ExecuteAsync(Guid partnerId)
+        public async Task<Result<bool, Error>> ExecuteAsync(InactivatePartnerRequestUseCase request)
         {
-            var partner = await partnerRepository.GetByIdAsync(partnerId);
+            var partner = await partnerRepository.GetByIdAsync(request.PartnerId, unitOfWork.Transaction);
             if (partner is null)
-                return Result<bool, string>.Fail("Partner not found.");
+                return Result<bool, Error>.Fail(DomainErrors.Partner.NotFound);
 
-            var affiliates = await affiliateRepository.GetByPartnerIdAsync(partnerId);
-            if (affiliates.Any(a => a.IsActive))
-                return Result<bool, string>.Fail("Cannot inactivate partner with active affiliates.");
+            var affiliates = await affiliateRepository.GetActivesByPartnerIdAsync(request.PartnerId, unitOfWork.Transaction);
+            if (affiliates.Any())
+                return Result<bool, Error>.Fail(DomainErrors.Partner.HasActiveAffiliates);
 
-            var hasActiveProposals = await proposalRepository.ExistsActiveByPartnerIdAsync(partnerId);
+            var hasActiveProposals = await proposalRepository.ExistsActiveByPartnerIdAsync(request.PartnerId, unitOfWork.Transaction);
             if (hasActiveProposals)
-                return Result<bool, string>.Fail("Cannot inactivate partner with active or pending proposals.");
+                return Result<bool, Error>.Fail(DomainErrors.Partner.HasActiveProposals);
 
-            await partnerRepository.InactivateAsync(partnerId, userContext.GetRequiredUserId(), DateTime.UtcNow);
+            await partnerRepository.InactivateAsync(request.PartnerId, userContext.GetRequiredUserId(), unitOfWork.Transaction);
 
-            return Result<bool, string>.Ok(true);
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

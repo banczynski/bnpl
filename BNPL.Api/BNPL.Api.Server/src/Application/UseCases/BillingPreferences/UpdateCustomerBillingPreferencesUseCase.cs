@@ -4,31 +4,41 @@ using BNPL.Api.Server.src.Application.Mappers;
 using Core.Context.Extensions;
 using Core.Context.Interfaces;
 using Core.Models;
+using Core.Persistence.Interfaces;
 
 namespace BNPL.Api.Server.src.Application.UseCases.BillingPreferences
 {
+    public sealed record UpdateCustomerBillingPreferencesRequestUseCase(
+        Guid CustomerId,
+        Guid AffiliateId,
+        UpdateCustomerBillingPreferencesRequest Dto
+    );
+
     public sealed class UpdateCustomerBillingPreferencesUseCase(
         ICustomerBillingPreferencesRepository billingPreferencesRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<UpdateCustomerBillingPreferencesRequestUseCase, Result<CustomerBillingPreferencesDto, Error>>
     {
-        public async Task<Result<CustomerBillingPreferencesDto, string>> ExecuteAsync(Guid customerId, Guid affiliateId, UpdateCustomerBillingPreferencesRequest request)
+        public async Task<Result<CustomerBillingPreferencesDto, Error>> ExecuteAsync(UpdateCustomerBillingPreferencesRequestUseCase useCaseRequest)
         {
-            if (request.InvoiceDueDay is < 1 or > 28)
-                return Result<CustomerBillingPreferencesDto, string>.Fail("Invoice due day must be between 1 and 28.");
+            var (customerId, affiliateId, request) = useCaseRequest;
 
-            var preferences = await billingPreferencesRepository.GetByCustomerIdAndAffiliateIdAsync(customerId, affiliateId);
+            if (request.InvoiceDueDay is < 1 or > 28)
+                return Result<CustomerBillingPreferencesDto, Error>.Fail(DomainErrors.Billing.InvalidDueDay);
+
+            var preferences = await billingPreferencesRepository.GetByCustomerIdAndAffiliateIdAsync(customerId, affiliateId, unitOfWork.Transaction);
             if (preferences is null)
-                return Result<CustomerBillingPreferencesDto, string>.Fail("Billing preferences not found.");
+                return Result<CustomerBillingPreferencesDto, Error>.Fail(DomainErrors.Billing.NotFound);
 
             preferences.InvoiceDueDay = request.InvoiceDueDay;
             preferences.ConsolidatedInvoiceEnabled = request.ConsolidatedInvoiceEnabled;
             preferences.UpdatedAt = DateTime.UtcNow;
             preferences.UpdatedBy = userContext.GetRequiredUserId();
 
-            await billingPreferencesRepository.UpdateAsync(preferences);
+            await billingPreferencesRepository.UpdateAsync(preferences, unitOfWork.Transaction);
 
-            return Result<CustomerBillingPreferencesDto, string>.Ok(preferences.ToDto());
+            return Result<CustomerBillingPreferencesDto, Error>.Ok(preferences.ToDto());
         }
     }
 }

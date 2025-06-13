@@ -5,64 +5,46 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
 {
-    public sealed class CreditAnalysisConfigurationRepository(IDbConnection connection) : ICreditAnalysisConfigurationRepository
+    public sealed class CreditAnalysisConfigurationRepository(IDbConnection connection) : GenericRepository<CreditAnalysisConfiguration>(connection), ICreditAnalysisConfigurationRepository
     {
-        public async Task InsertAsync(CreditAnalysisConfiguration config, IDbTransaction? transaction = null)
-            => await connection.InsertAsync(config, transaction);
+        private const string InactivateByPartnerOrAffiliateSql = """
+        UPDATE credit_analysis_configuration
+        SET is_active = FALSE,
+            updated_by = @UpdatedBy,
+            updated_at = @UpdatedAt
+        WHERE partner_id = @PartnerId
+          AND (@AffiliateId IS NULL AND affiliate_id IS NULL OR affiliate_id = @AffiliateId)
+        """;
+        private const string GetByAffiliateSql = "SELECT * FROM credit_analysis_configuration WHERE affiliate_id = @AffiliateId AND is_active = TRUE LIMIT 1";
+        private const string GetByPartnerSql = "SELECT * FROM credit_analysis_configuration WHERE partner_id = @PartnerId AND affiliate_id IS NULL AND is_active = TRUE LIMIT 1";
+        private const string GetAllByPartnerSql = "SELECT * FROM credit_analysis_configuration WHERE partner_id = @PartnerId AND is_active = TRUE";
 
-        public async Task UpdateAsync(CreditAnalysisConfiguration config, IDbTransaction? transaction = null)
-            => await connection.UpdateAsync(config, transaction);
-
-        public async Task InactivateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, DateTime updatedAt, IDbTransaction? transaction = null)
+        public async Task<bool> InactivateByPartnerOrAffiliateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            UPDATE credit_analysis_configuration
-            SET is_active = FALSE,
-                updated_by = @UpdatedBy,
-                updated_at = @UpdatedAt
-            WHERE partner_id = @PartnerId
-            AND (@AffiliateId IS NULL OR affiliate_id = @AffiliateId)
-            """;
-
-            await connection.ExecuteAsync(sql, new
+            var affectedRows = await Connection.ExecuteAsync(InactivateByPartnerOrAffiliateSql, new
             {
                 PartnerId = partnerId,
                 AffiliateId = affiliateId,
                 UpdatedBy = updatedBy,
-                UpdatedAt = updatedAt
+                UpdatedAt = DateTime.UtcNow
             }, transaction);
+
+            return affectedRows > 0;
         }
 
         public async Task<CreditAnalysisConfiguration?> GetByAffiliateAsync(Guid affiliateId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM credit_analysis_configuration
-            WHERE affiliate_id = @AffiliateId AND is_active = TRUE
-            LIMIT 1
-            """;
-
-            return await connection.QueryFirstOrDefaultAsync<CreditAnalysisConfiguration>(sql, new { AffiliateId = affiliateId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<CreditAnalysisConfiguration>(GetByAffiliateSql, new { AffiliateId = affiliateId }, transaction);
         }
 
         public async Task<CreditAnalysisConfiguration?> GetByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM credit_analysis_configuration
-            WHERE partner_id = @PartnerId AND affiliate_id IS NULL AND is_active = TRUE
-            LIMIT 1
-            """;
-
-            return await connection.QueryFirstOrDefaultAsync<CreditAnalysisConfiguration>(sql, new { PartnerId = partnerId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<CreditAnalysisConfiguration>(GetByPartnerSql, new { PartnerId = partnerId }, transaction);
         }
 
         public async Task<IEnumerable<CreditAnalysisConfiguration>> GetAllByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM credit_analysis_configuration
-            WHERE partner_id = @PartnerId AND is_active = TRUE
-            """;
-
-            return await connection.QueryAsync<CreditAnalysisConfiguration>(sql, new { PartnerId = partnerId }, transaction);
+            return await Connection.QueryAsync<CreditAnalysisConfiguration>(GetAllByPartnerSql, new { PartnerId = partnerId }, transaction);
         }
     }
 }

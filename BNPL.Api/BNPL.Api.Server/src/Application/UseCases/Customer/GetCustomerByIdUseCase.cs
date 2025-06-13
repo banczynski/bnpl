@@ -7,14 +7,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.Customer
 {
     public sealed class GetCustomerByIdUseCase(ICustomerRepository customerRepository)
     {
-        public async Task<Result<CustomerDto, string>> ExecuteAsync(Guid customerId)
+        public async Task<Result<CustomerDto, Error>> ExecuteAsync(Guid customerId)
         {
             var entity = await customerRepository.GetByIdAsync(customerId);
 
             if (entity is null)
-                return Result<CustomerDto, string>.Fail("Customer not found.");
+                return Result<CustomerDto, Error>.Fail(DomainErrors.Customer.NotFound);
 
-            return Result<CustomerDto, string>.Ok(entity.ToDto());
+            return Result<CustomerDto, Error>.Ok(entity.ToDto());
         }
     }
 }

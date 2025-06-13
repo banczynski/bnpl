@@ -12,7 +12,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
         UpsertCustomerCreditLimitUseCase creditLimitUseCase
     )
     {
-        public async Task<Result<CreditAnalysisResult, string>> ExecuteAsync(
+        public async Task<Result<CreditAnalysisResult, Error>> ExecuteAsync(
             Guid partnerId,
             Guid affiliateId,
             string customerTaxId,
@@ -21,19 +21,21 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
             var decision = await creditAnalysisService.AnalyzeAsync(partnerId, affiliateId, customerTaxId);
 
             if (decision.Decision != Domain.Enums.CreditAnalysisStatus.Approved || decision.ApprovedLimit <= 0)
-                return Result<CreditAnalysisResult, string>.Fail("Credit denied.");
+                return Result<CreditAnalysisResult, Error>.Fail(DomainErrors.CreditAnalysis.CreditDenied);
 
-            var creditLimitResult = await creditLimitUseCase.ExecuteAsync(new CreditLimitUpsertRequest(
+            var creditLimitRequest = new CreditLimitUpsertRequest(
                 PartnerId: partnerId,
                 AffiliateId: affiliateId,
                 CustomerTaxId: customerTaxId,
                 ApprovedLimit: decision.ApprovedLimit
-            ), transaction);
+            );
+
+            var creditLimitResult = await creditLimitUseCase.ExecuteAsync(creditLimitRequest, transaction);
 
             if (creditLimitResult.TryGetError(out var error))
-                return Result<CreditAnalysisResult, string>.Fail(error);
+                return Result<CreditAnalysisResult, Error>.Fail(error!);
 
-            return Result<CreditAnalysisResult, string>.Ok(decision);
+            return Result<CreditAnalysisResult, Error>.Ok(decision);
         }
     }
 }

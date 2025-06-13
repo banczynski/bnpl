@@ -1,4 +1,6 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Proposal;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.Proposal;
+using BNPL.Api.Server.src.Application.DTOs.Signature;
 using BNPL.Api.Server.src.Application.UseCases.Proposal;
 using BNPL.Api.Server.src.Application.UseCases.Signature;
 using Core.Models;
@@ -11,87 +13,134 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public sealed class ProposalController(
-        CreateProposalUseCase createUseCase,
-        InactivateProposalUseCase inactivateUseCase,
-        CancelProposalUseCase cancelUseCase,
-        CancelProposalsUseCase cancelProposalsUseCase,
+        IUseCase<CreateProposalRequestUseCase, Result<CreateProposalResponse, Error>> createUseCase,
+        IUseCase<InactivateProposalRequestUseCase, Result<bool, Error>> inactivateUseCase,
+        IUseCase<CancelProposalRequestUseCase, Result<bool, Error>> cancelUseCase,
+        IUseCase<CancelProposalsRequestUseCase, Result<int, Error>> cancelProposalsUseCase,
         GetProposalByIdUseCase getByIdUseCase,
         GetProposalWithItemsUseCase getWithItemsUseCase,
         GetProposalsByCustomerIdUseCase getByCustomerUseCase,
         GetProposalsByAffiliateIdUseCase getByAffiliateUseCase,
         GetProposalsByPartnerIdUseCase getByPartnerUseCase,
-        GenerateSignatureTokenUseCase generateSignatureLinkUseCase,
-        MarkProposalAsFinalizedUseCase markAsFinalizedUseCase,
-        MarkProposalAsApprovedUseCase markAsApprovedUseCase,
-        MarkProposalAsActiveUseCase markAsActiveUseCase,
+        IUseCase<GenerateSignatureTokenRequestUseCase, Result<SignatureTokenResponse, Error>> generateSignatureTokenUseCase,
+        IUseCase<MarkProposalAsFinalizedRequestUseCase, Result<bool, Error>> markAsFinalizedUseCase,
         GenerateFinalContractUseCase generateFinalContractUseCase
     ) : ControllerBase
     {
         [HttpPost("{simulationId:guid}")]
-        public async Task<ActionResult<Result<CreateProposalResponse, string[]>>> Create(
+        [ProducesResponseType(typeof(Result<CreateProposalResponse, Error>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(Result<CreateProposalResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<CreateProposalResponse, Error>>> Create(
             Guid simulationId,
             [FromQuery] int term)
         {
-            var result = await createUseCase.ExecuteAsync(simulationId, term);
+            var useCaseRequest = new CreateProposalRequestUseCase(simulationId, term);
+            var result = await createUseCase.ExecuteAsync(useCaseRequest);
 
-            if (result is Result<CreateProposalResponse, string>.Success success)
-                return CreatedAtAction(nameof(GetById), new { id = success.Value.Id }, result);
+            if (result.TryGetSuccess(out var successValue))
+                return CreatedAtAction(nameof(GetById), new { id = successValue.Id }, result);
 
             return BadRequest(result);
         }
 
-        [HttpPost("{proposalId:guid}/approve")]
-        public async Task<ActionResult<Result<string, string>>> MarkAsApproved(Guid proposalId)
-            => Ok(await markAsApprovedUseCase.ExecuteAsync(proposalId));
-
-        [HttpPost("{proposalId:guid}/activate")]
-        public async Task<ActionResult<Result<string, string>>> MarkAsActive(Guid proposalId)
-            => Ok(await markAsActiveUseCase.ExecuteAsync(proposalId));
-
         [HttpDelete("{id:guid}")]
-        public async Task<ActionResult<Result<string, string[]>>> Inactivate(Guid id)
-            => Ok(await inactivateUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> Inactivate(Guid id)
+        {
+            var useCaseRequest = new InactivateProposalRequestUseCase(id);
+            var result = await inactivateUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpGet("{id:guid}")]
-        public async Task<ActionResult<Result<ProposalDto, string[]>>> GetById(Guid id)
-            => Ok(await getByIdUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<ProposalDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<ProposalDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<ProposalDto, Error>>> GetById(Guid id)
+        {
+            var result = await getByIdUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
 
         [HttpGet("{id:guid}/with-items")]
-        public async Task<ActionResult<Result<ProposalWithItemsDto, string[]>>> GetWithItems(Guid id)
-            => Ok(await getWithItemsUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<ProposalWithItemsDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<ProposalWithItemsDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<ProposalWithItemsDto, Error>>> GetWithItems(Guid id)
+        {
+            var result = await getWithItemsUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
 
         [HttpPost("{id:guid}/cancel")]
-        public async Task<ActionResult<Result<string, string[]>>> Cancel(Guid id)
-            => Ok(await cancelUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> Cancel(Guid id)
+        {
+            var useCaseRequest = new CancelProposalRequestUseCase(id);
+            var result = await cancelUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
-        // TODO Esse processo deverá ser disparado por um cron
         [HttpPost("cancel")]
-        public async Task<ActionResult<Result<int, string[]>>> Cancel()
-            => Ok(await cancelProposalsUseCase.ExecuteAsync());
+        [ProducesResponseType(typeof(Result<int, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<int, Error>>> Cancel()
+        {
+            var useCaseRequest = new CancelProposalsRequestUseCase();
+            var result = await cancelProposalsUseCase.ExecuteAsync(useCaseRequest);
+            return Ok(result);
+        }
 
         [HttpGet("by-customer/{customerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, string[]>>> GetByCustomer(Guid customerId, [FromQuery] bool onlyActive = true)
-            => Ok(await getByCustomerUseCase.ExecuteAsync(customerId, onlyActive));
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, Error>>> GetByCustomer(Guid customerId)
+        {
+            var result = await getByCustomerUseCase.ExecuteAsync(customerId);
+            return Ok(result);
+        }
 
         [HttpGet("by-affiliate/{affiliateId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, string[]>>> GetByAffiliate(Guid affiliateId, [FromQuery] bool onlyActive = true)
-            => Ok(await getByAffiliateUseCase.ExecuteAsync(affiliateId, onlyActive));
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, Error>>> GetByAffiliate(Guid affiliateId)
+        {
+            var result = await getByAffiliateUseCase.ExecuteAsync(affiliateId);
+            return Ok(result);
+        }
 
         [HttpGet("by-partner/{partnerId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, string[]>>> GetByPartner(Guid partnerId, [FromQuery] bool onlyActive = true)
-            => Ok(await getByPartnerUseCase.ExecuteAsync(partnerId, onlyActive));
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<ProposalDto>, Error>>> GetByPartner(Guid partnerId)
+        {
+            var result = await getByPartnerUseCase.ExecuteAsync(partnerId);
+            return Ok(result);
+        }
 
         [HttpPost("{id:guid}/generate-signature-link")]
-        public async Task<ActionResult<Result<Uri, string[]>>> GenerateSignatureLink(Guid id)
-            => Ok(await generateSignatureLinkUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<SignatureTokenResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<SignatureTokenResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<SignatureTokenResponse, Error>>> GenerateSignatureLink(Guid id)
+        {
+            var useCaseRequest = new GenerateSignatureTokenRequestUseCase(id);
+            var result = await generateSignatureTokenUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
-        // TODO Esse processo deverá ser disparado por um cron
         [HttpPost("{id:guid}/finalize")]
-        public async Task<ActionResult<Result<string, string[]>>> Finalize(Guid id)
-            => Ok(await markAsFinalizedUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> Finalize(Guid id)
+        {
+            var useCaseRequest = new MarkProposalAsFinalizedRequestUseCase(id);
+            var result = await markAsFinalizedUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpPost("{id:guid}/generate-contract")]
-        public async Task<ActionResult<Result<Uri, string[]>>> GenerateContract(Guid id)
-            => Ok(await generateFinalContractUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<Uri, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<Uri, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<Uri, Error>>> GenerateContract(Guid id)
+        {
+            var result = await generateFinalContractUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
     }
 }

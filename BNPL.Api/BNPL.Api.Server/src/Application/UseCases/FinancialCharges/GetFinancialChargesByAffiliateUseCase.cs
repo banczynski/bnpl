@@ -8,14 +8,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.FinancialCharges
     public sealed class GetFinancialChargesByAffiliateUseCase(
         IFinancialChargesConfigurationRepository financialChargesConfigurationRepository)
     {
-        public async Task<Result<FinancialChargesConfigDto, string>> ExecuteAsync(Guid affiliateId)
+        public async Task<Result<FinancialChargesConfigDto, Error>> ExecuteAsync(Guid affiliateId)
         {
             var config = await financialChargesConfigurationRepository.GetByAffiliateAsync(affiliateId);
 
             if (config is null)
-                return Result<FinancialChargesConfigDto, string>.Fail("Configuration not found.");
+                return Result<FinancialChargesConfigDto, Error>.Fail(DomainErrors.FinancialCharges.ConfigNotFound);
 
-            return Result<FinancialChargesConfigDto, string>.Ok(config.ToDto());
+            return Result<FinancialChargesConfigDto, Error>.Ok(config.ToDto());
         }
     }
 }

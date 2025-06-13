@@ -15,32 +15,30 @@ namespace BNPL.Api.Server.src.Application.UseCases.Invoice
         IPaymentLinkService paymentLinkService
     )
     {
-        public async Task<Result<GeneratePaymentLinkResponse, string>> ExecuteAsync(Guid invoiceId)
+        public async Task<Result<GeneratePaymentLinkResponse, Error>> ExecuteAsync(Guid invoiceId)
         {
             var invoice = await invoiceRepository.GetByIdAsync(invoiceId);
             if (invoice is null)
-                return Result<GeneratePaymentLinkResponse, string>.Fail("Invoice not found.");
+                return Result<GeneratePaymentLinkResponse, Error>.Fail(DomainErrors.Invoice.NotFound);
 
             var installments = await installmentRepository.GetByInvoiceIdAsync(invoiceId);
             if (!installments.Any())
-                return Result<GeneratePaymentLinkResponse, string>.Fail("Invoice has no installments.");
+                return Result<GeneratePaymentLinkResponse, Error>.Fail(DomainErrors.Invoice.HasNoInstallments);
 
             var config = await configService.GetEffectiveConfigAsync(invoice.PartnerId, invoice.AffiliateId);
-
             decimal totalWithCharges = 0m;
             var today = DateTime.UtcNow.Date;
 
             foreach (var i in installments)
             {
-                var charges = chargesService.Calculate(new InstallmentChargesInput(
+                var chargesResult = chargesService.Calculate(new InstallmentChargesInput(
                     OriginalAmount: i.Amount,
                     DueDate: i.DueDate,
                     PaymentDate: today,
                     DailyInterestRate: config.InterestRate,
                     FixedChargesRate: config.ChargesRate
                 ));
-
-                totalWithCharges += charges.TotalWithCharges;
+                totalWithCharges += chargesResult.TotalWithCharges;
             }
 
             var paymentLink = await paymentLinkService.GenerateAsync(new PaymentLinkRequest(
@@ -58,7 +56,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Invoice
                 PaymentLink: paymentLink
             );
 
-            return Result<GeneratePaymentLinkResponse, string>.Ok(response);
+            return Result<GeneratePaymentLinkResponse, Error>.Ok(response);
         }
     }
 }

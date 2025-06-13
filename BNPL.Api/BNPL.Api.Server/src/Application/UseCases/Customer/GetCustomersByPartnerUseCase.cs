@@ -7,10 +7,10 @@ namespace BNPL.Api.Server.src.Application.UseCases.Customer
 {
     public sealed class GetCustomersByPartnerUseCase(ICustomerRepository customerRepository)
     {
-        public async Task<Result<IEnumerable<CustomerDto>, string>> ExecuteAsync(Guid partnerId, bool onlyActive = true)
+        public async Task<Result<IEnumerable<CustomerDto>, Error>> ExecuteAsync(Guid partnerId)
         {
-            var customers = await customerRepository.GetByPartnerIdAsync(partnerId, onlyActive);
-            return Result<IEnumerable<CustomerDto>, string>.Ok(customers.Select(c => c.ToDto()));
+            var customers = await customerRepository.GetActivesByPartnerIdAsync(partnerId);
+            return Result<IEnumerable<CustomerDto>, Error>.Ok(customers.Select(c => c.ToDto()));
         }
     }
 }

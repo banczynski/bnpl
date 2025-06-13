@@ -5,8 +5,8 @@ namespace BNPL.Api.Server.src.Application.Abstractions.Identity
 {
     public interface ICognitoAuthService
     {
-        Task<Result<LoginResponse, string>> AuthenticateAsync(LoginRequest request);
-        Task<Result<LoginResponse, string>> RefreshTokenAsync(RefreshTokenRequest request);
-        Task<Result<LoginResponse, string>> CompleteNewPasswordChallengeAsync(CompleteChallengeRequest request);
+        Task<Result<LoginResponse, Error>> AuthenticateAsync(LoginRequest request);
+        Task<Result<LoginResponse, Error>> RefreshTokenAsync(RefreshTokenRequest request);
+        Task<Result<LoginResponse, Error>> CompleteNewPasswordChallengeAsync(CompleteChallengeRequest request);
     }
 }

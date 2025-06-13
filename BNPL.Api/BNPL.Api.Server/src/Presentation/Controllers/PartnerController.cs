@@ -1,4 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.Partner;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.Partner;
 using BNPL.Api.Server.src.Application.UseCases.Partner;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -10,38 +11,62 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [ApiController]
     [Route("api/[controller]")]
     public sealed class PartnerController(
-        CreatePartnerUseCase createUseCase,
-        UpdatePartnerUseCase updateUseCase,
-        InactivatePartnerUseCase inactivateUseCase,
+        IUseCase<CreatePartnerRequestUseCase, Result<CreatePartnerResponse, Error>> createUseCase,
+        IUseCase<UpdatePartnerRequestUseCase, Result<PartnerDto, Error>> updateUseCase,
+        IUseCase<InactivatePartnerRequestUseCase, Result<bool, Error>> inactivateUseCase,
         GetPartnerByIdUseCase getByIdUseCase,
         GetAllPartnersUseCase getAllUseCase
     ) : ControllerBase
     {
         [HttpPost]
-        public async Task<ActionResult<Result<CreatePartnerResponse, string[]>>> Create([FromBody] CreatePartnerRequest request)
+        [ProducesResponseType(typeof(Result<CreatePartnerResponse, Error>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(Result<CreatePartnerResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<CreatePartnerResponse, Error>>> Create([FromBody] CreatePartnerRequest request)
         {
-            var result = await createUseCase.ExecuteAsync(request);
+            var useCaseRequest = new CreatePartnerRequestUseCase(request);
+            var result = await createUseCase.ExecuteAsync(useCaseRequest);
 
-            if (result is Result<CreatePartnerResponse, string[]>.Success success)
-                return CreatedAtAction(nameof(GetById), new { id = success.Value.Id }, result);
+            if (result.TryGetSuccess(out var successValue))
+                return CreatedAtAction(nameof(GetById), new { id = successValue.Id }, result);
 
             return BadRequest(result);
         }
 
         [HttpPut("{id:guid}")]
-        public async Task<ActionResult<Result<PartnerDto, string>>> Update(Guid id, [FromBody] UpdatePartnerRequest request)
-            => Ok(await updateUseCase.ExecuteAsync(id, request));
+        [ProducesResponseType(typeof(Result<PartnerDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<PartnerDto, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<PartnerDto, Error>>> Update(Guid id, [FromBody] UpdatePartnerRequest request)
+        {
+            var useCaseRequest = new UpdatePartnerRequestUseCase(id, request);
+            var result = await updateUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpDelete("{id:guid}")]
-        public async Task<ActionResult<Result<bool, string>>> Inactivate(Guid id)
-            => Ok(await inactivateUseCase.ExecuteAsync(id));
-
-        [HttpGet("{id:guid}")]
-        public async Task<ActionResult<Result<PartnerDto, string>>> GetById(Guid id)
-            => Ok(await getByIdUseCase.ExecuteAsync(id));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> Inactivate(Guid id)
+        {
+            var useCaseRequest = new InactivatePartnerRequestUseCase(id);
+            var result = await inactivateUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpGet]
-        public async Task<ActionResult<Result<IEnumerable<PartnerDto>, string>>> GetAll([FromQuery] bool onlyActive = true)
-            => Ok(await getAllUseCase.ExecuteAsync(onlyActive));
+        [ProducesResponseType(typeof(Result<IEnumerable<PartnerDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<PartnerDto>, Error>>> GetAll()
+        {
+            var result = await getAllUseCase.ExecuteAsync();
+            return Ok(result);
+        }
+
+        [HttpGet("{id:guid}")]
+        [ProducesResponseType(typeof(Result<PartnerDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<PartnerDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<PartnerDto, Error>>> GetById(Guid id)
+        {
+            var result = await getByIdUseCase.ExecuteAsync(id);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
     }
 }

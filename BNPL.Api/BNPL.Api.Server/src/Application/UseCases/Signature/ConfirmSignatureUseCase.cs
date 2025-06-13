@@ -1,7 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.External;
-using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+﻿using Core.Persistence.Interfaces;
 using BNPL.Api.Server.src.Application.Abstractions.Repositories;
-using BNPL.Api.Server.src.Application.UseCases.Proposal;
 using BNPL.Api.Server.src.Domain.Enums;
 using Core.Context.Extensions;
 using Core.Context.Interfaces;
@@ -9,47 +7,40 @@ using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Signature
 {
+    public sealed record ConfirmSignatureRequestUseCase(Guid ProposalId, string Token);
+
     public sealed class ConfirmSignatureUseCase(
         IProposalRepository proposalRepository,
         IProposalSignatureRepository proposalSignatureRepository,
         IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<ConfirmSignatureRequestUseCase, Result<bool, Error>>
     {
-        public async Task<Result<bool, string>> ExecuteAsync(Guid proposalId, string token)
+        public async Task<Result<bool, Error>> ExecuteAsync(ConfirmSignatureRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var (proposalId, token) = request;
 
-            try
-            {
-                scope.Begin();
+            var proposal = await proposalRepository.GetByIdAsync(proposalId, unitOfWork.Transaction);
+            if (proposal is null)
+                return Result<bool, Error>.Fail(DomainErrors.Proposal.NotFound);
 
-                var proposal = await proposalRepository.GetByIdAsync(proposalId, scope.Transaction);
-                if (proposal is null)
-                    return Result<bool, string>.Fail("Proposal not found.");
+            if (proposal.Status != ProposalStatus.AwaitingSignature)
+                return Result<bool, Error>.Fail(DomainErrors.Proposal.NotEligibleForSignature);
 
-                if (proposal.Status != ProposalStatus.AwaitingSignature)
-                    return Result<bool, string>.Fail("Proposal is not awaiting signature.");
+            var signature = await proposalSignatureRepository.GetByProposalIdAsync(proposal.Code, unitOfWork.Transaction);
+            if (signature is null || signature.ExternalSignatureId != token || signature.Status != SignatureStatus.Pending)
+                return Result<bool, Error>.Fail(DomainErrors.Signature.InvalidToken);
 
-                var signature = await proposalSignatureRepository.GetByProposalIdAsync(proposal.Code, scope.Transaction);
-                if (signature is null || signature.ExternalSignatureId != token || signature.Status != SignatureStatus.Pending)
-                    return Result<bool, string>.Fail("Invalid or expired token.");
+            var now = DateTime.UtcNow;
+            var userId = userContext.GetRequiredUserId();
 
-                proposal.MarkAsSigned(DateTime.UtcNow, userContext.GetRequiredUserId());
-                await proposalRepository.UpdateAsync(proposal, scope.Transaction);
+            proposal.MarkAsSigned(now, userId);
+            await proposalRepository.UpdateAsync(proposal, unitOfWork.Transaction);
 
-                signature.MarkAsSigned(DateTime.UtcNow, userContext.GetRequiredUserId());
-                await proposalSignatureRepository.UpdateAsync(signature, scope.Transaction);
+            signature.MarkAsSigned(now, userId);
+            await proposalSignatureRepository.UpdateAsync(signature, unitOfWork.Transaction);
 
-                scope.Commit();
-
-                return Result<bool, string>.Ok(true);
-            }
-            catch
-            {
-                scope.Rollback();
-                throw;
-            }
+            return Result<bool, Error>.Ok(true);
         }
     }
 }

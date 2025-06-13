@@ -5,24 +5,19 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
 {
-    public sealed class ProposalSignatureRepository(IDbConnection connection) : IProposalSignatureRepository
+    public sealed class ProposalSignatureRepository(IDbConnection connection) : GenericRepository<ProposalSignature>(connection), IProposalSignatureRepository
     {
-        public async Task InsertAsync(ProposalSignature signature, IDbTransaction? transaction = null)
-            => await connection.InsertAsync(signature, transaction);
-
-        public async Task UpdateAsync(ProposalSignature signature, IDbTransaction? transaction = null)
-            => await connection.UpdateAsync(signature, transaction);
+        private const string GetByProposalIdSql = "SELECT * FROM proposal_signature WHERE proposal_id = @ProposalId LIMIT 1";
+        private const string GetByExternalIdSql = "SELECT * FROM proposal_signature WHERE external_signature_id = @ExternalSignatureId LIMIT 1";
 
         public async Task<ProposalSignature?> GetByProposalIdAsync(Guid proposalId, IDbTransaction? transaction = null)
         {
-            const string sql = "SELECT * FROM proposal_signature WHERE proposal_id = @ProposalId LIMIT 1";
-            return await connection.QueryFirstOrDefaultAsync<ProposalSignature>(sql, new { ProposalId = proposalId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<ProposalSignature>(GetByProposalIdSql, new { ProposalId = proposalId }, transaction);
         }
 
         public async Task<ProposalSignature?> GetByExternalIdAsync(string externalSignatureId, IDbTransaction? transaction = null)
         {
-            const string sql = "SELECT * FROM proposal_signature WHERE external_signature_id = @ExternalSignatureId LIMIT 1";
-            return await connection.QueryFirstOrDefaultAsync<ProposalSignature>(sql, new { ExternalSignatureId = externalSignatureId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<ProposalSignature>(GetByExternalIdSql, new { ExternalSignatureId = externalSignatureId }, transaction);
         }
     }
 }

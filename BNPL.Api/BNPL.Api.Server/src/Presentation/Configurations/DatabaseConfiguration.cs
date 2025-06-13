@@ -1,5 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
-using BNPL.Api.Server.src.Infrastructure.Persistence;
+﻿using Core.Persistence;
+using Core.Persistence.Interfaces;
 using System.Data;
 
 namespace BNPL.Api.Server.src.Presentation.Configurations

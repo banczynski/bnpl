@@ -1,4 +1,5 @@
-﻿using BNPL.Api.Server.src.Application.DTOs.ProposalItem;
+﻿using Core.Persistence.Interfaces;
+using BNPL.Api.Server.src.Application.DTOs.ProposalItem;
 using BNPL.Api.Server.src.Application.UseCases.ProposalItem;
 using Core.Models;
 using Microsoft.AspNetCore.Authorization;
@@ -11,36 +12,64 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     [Route("api/[controller]")]
     public sealed class ProposalItemController(
         GetProposalItemsByProposalIdUseCase getUseCase,
-        MarkProposalItemAsReturnedUseCase returnUseCase,
-        ConfirmProposalItemReturnUseCase confirmReturnUseCase,
-        CreateProposalItemUseCase createUseCase,
-        CreateProposalItemsUseCase createManyUseCase
+        IUseCase<MarkProposalItemAsReturnedRequestUseCase, Result<bool, Error>> returnUseCase,
+        IUseCase<ConfirmProposalItemReturnRequestUseCase, Result<bool, Error>> confirmReturnUseCase,
+        IUseCase<CreateProposalItemRequestUseCase, Result<ProposalItemDto, Error>> createUseCase,
+        IUseCase<CreateProposalItemsRequestUseCase, Result<IEnumerable<ProposalItemDto>, Error>> createManyUseCase
     ) : ControllerBase
     {
         [HttpGet("by-proposal/{proposalId:guid}")]
-        public async Task<ActionResult<Result<IEnumerable<ProposalItemDto>, string[]>>> GetByProposal(Guid proposalId)
-            => Ok(await getUseCase.ExecuteAsync(proposalId));
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalItemDto>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<ProposalItemDto>, Error>>> GetByProposal(Guid proposalId)
+        {
+            var result = await getUseCase.ExecuteAsync(proposalId);
+            return Ok(result);
+        }
 
-        [HttpPost("{proposalId:guid}/return")]
-        public async Task<ActionResult<Result<bool, string[]>>> ReturnItem(
-            Guid proposalId, 
+        [HttpPost("{itemId:guid}/return")]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> ReturnItem(
+            Guid itemId,
             [FromBody] ReturnProposalItemRequest request)
-            => Ok(await returnUseCase.ExecuteAsync(proposalId, request.Reason));
+        {
+            var useCaseRequest = new MarkProposalItemAsReturnedRequestUseCase(itemId, request.Reason);
+            var result = await returnUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpPost("confirm-return/{itemId:guid}")]
-        public async Task<ActionResult<Result<bool, string>>> ConfirmReturn(Guid itemId)
-            => Ok(await confirmReturnUseCase.ExecuteAsync(itemId));
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<bool, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<bool, Error>>> ConfirmReturn(Guid itemId)
+        {
+            var useCaseRequest = new ConfirmProposalItemReturnRequestUseCase(itemId);
+            var result = await confirmReturnUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpPost("{proposalId:guid}/item")]
-        public async Task<ActionResult<Result<ProposalItemDto, string[]>>> AddItem(
+        [ProducesResponseType(typeof(Result<ProposalItemDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<ProposalItemDto, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<ProposalItemDto, Error>>> AddItem(
             Guid proposalId,
             [FromBody] CreateProposalItemRequest request)
-            => Ok(await createUseCase.ExecuteAsync(proposalId, request));
+        {
+            var useCaseRequest = new CreateProposalItemRequestUseCase(proposalId, request);
+            var result = await createUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
 
         [HttpPost("{proposalId:guid}/items")]
-        public async Task<ActionResult<Result<IEnumerable<ProposalItemDto>, string[]>>> AddItems(
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalItemDto>, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<IEnumerable<ProposalItemDto>, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<IEnumerable<ProposalItemDto>, Error>>> AddItems(
             Guid proposalId,
             [FromBody] CreateProposalItemsRequest request)
-            => Ok(await createManyUseCase.ExecuteAsync(proposalId, request));
+        {
+            var useCaseRequest = new CreateProposalItemsRequestUseCase(proposalId, request);
+            var result = await createManyUseCase.ExecuteAsync(useCaseRequest);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
+        }
     }
 }

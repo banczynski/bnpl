@@ -1,6 +1,7 @@
 ﻿using BNPL.Api.Server.src.Application.Abstractions.Business;
 using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using BNPL.Api.Server.src.Application.DTOs.Installment;
+using BNPL.Api.Server.src.Domain.Entities;
 using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Installment
@@ -11,16 +12,36 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
         IFinancialChargesConfigurationService configService
     )
     {
-        public async Task<Result<List<InstallmentChargesReportItem>, string>> ExecuteAsync(DateTime? referenceDate = null)
+        public async Task<Result<List<InstallmentChargesReportItem>, Error>> ExecuteAsync(DateTime? referenceDate = null)
         {
             var today = (referenceDate ?? DateTime.UtcNow).Date;
-            var overdueInstallments = await installmentRepository.GetPendingDueInDaysAsync(-1);
+            var overdueInstallments = (await installmentRepository.GetPendingDueInDaysAsync(-1))
+                .Where(i => i.DueDate < today && i.InvoiceId == null)
+                .ToList();
+
+            if (overdueInstallments.Count == 0)
+                return Result<List<InstallmentChargesReportItem>, Error>.Ok([]);
 
             var results = new List<InstallmentChargesReportItem>();
 
-            foreach (var installment in overdueInstallments.Where(i => i.DueDate < today && i.InvoiceId == null))
+            var configKeys = overdueInstallments
+                .Select(i => (i.PartnerId, i.AffiliateId))
+                .Distinct()
+                .ToList();
+
+            var configMap = new Dictionary<(Guid, Guid?), FinancialChargesConfiguration>();
+            foreach (var (partnerId, affiliateId) in configKeys)
             {
-                var config = await configService.GetEffectiveConfigAsync(installment.PartnerId, installment.AffiliateId);
+                var config = await configService.GetEffectiveConfigAsync(partnerId, affiliateId);
+                configMap[(partnerId, affiliateId)] = config;
+            }
+
+            foreach (var installment in overdueInstallments)
+            {
+                if (!configMap.TryGetValue((installment.PartnerId, installment.AffiliateId), out var config))
+                {
+                    continue;
+                }
 
                 var charges = chargesCalculator.Calculate(new InstallmentChargesInput(
                     OriginalAmount: installment.Amount,
@@ -45,7 +66,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
                 ));
             }
 
-            return Result<List<InstallmentChargesReportItem>, string>.Ok(results);
+            return Result<List<InstallmentChargesReportItem>, Error>.Ok(results);
         }
     }
 }

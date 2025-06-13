@@ -1,4 +1,4 @@
-﻿using BNPL.Api.Server.src.Application.UseCases.BillingPreferences;
+﻿using BNPL.Api.Server.src.Application.DTOs.BillingPreferences;
 using BNPL.Api.Server.src.Domain.Entities;
 
 namespace BNPL.Api.Server.src.Application.Mappers

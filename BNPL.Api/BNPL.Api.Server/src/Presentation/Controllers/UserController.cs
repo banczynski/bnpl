@@ -1,89 +1,114 @@
 ﻿using BNPL.Api.Server.src.Application.Abstractions.Identity;
 using BNPL.Api.Server.src.Application.DTOs.User;
 using Core.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BNPL.Api.Server.src.Presentation.Controllers
 {
+    [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/[controller]")]
     public sealed class UserController(ICognitoUserService service) : ControllerBase
     {
         [HttpPost]
-        public async Task<ActionResult<Result<string, string[]>>> Create([FromBody] CreateUserRequest request)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status201Created)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> Create([FromBody] CreateUserRequest request)
         {
-            await service.CreateUserAsync(request);
-            return CreatedAtAction(nameof(GetByEmail), new { email = request.Email }, Result<string, string[]>.Ok(request.Email));
+            var result = await service.CreateUserAsync(request);
+            if (result.IsFailure) return BadRequest(result);
+
+            var response = Result<string, Error>.Ok(request.Email);
+            return CreatedAtAction(nameof(GetByEmail), new { email = request.Email }, response);
         }
 
         [HttpDelete("{email}")]
-        public async Task<ActionResult<Result<string, string[]>>> Delete(string email)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> Delete(string email)
         {
-            await service.DeleteUserAsync(email);
-            return Ok(Result<string, string[]>.Ok(email));
+            var result = await service.DeleteUserAsync(email);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok(email)) : BadRequest(result);
         }
 
         [HttpPost("{email}/enable")]
-        public async Task<ActionResult<Result<string, string[]>>> Enable(string email)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> Enable(string email)
         {
-            await service.EnableUserAsync(email);
-            return Ok(Result<string, string[]>.Ok(email));
+            var result = await service.EnableUserAsync(email);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok(email)) : BadRequest(result);
         }
 
         [HttpPost("{email}/disable")]
-        public async Task<ActionResult<Result<string, string[]>>> Disable(string email)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> Disable(string email)
         {
-            await service.DisableUserAsync(email);
-            return Ok(Result<string, string[]>.Ok(email));
+            var result = await service.DisableUserAsync(email);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok(email)) : BadRequest(result);
         }
 
         [HttpPost("{email}/reset-password")]
-        public async Task<ActionResult<Result<string, string[]>>> ResetPassword(string email)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> ResetPassword(string email)
         {
-            await service.ResetPasswordAsync(email);
-            return Ok(Result<string, string[]>.Ok(email));
+            var result = await service.ResetPasswordAsync(email);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok(email)) : BadRequest(result);
         }
 
         [HttpPost("{email}/groups/{group}")]
-        public async Task<ActionResult<Result<string, string[]>>> AddToGroup(string email, string group)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> AddToGroup(string email, string group)
         {
-            await service.AddToGroupAsync(email, group);
-            return Ok(Result<string, string[]>.Ok($"{email}:{group}"));
+            var result = await service.AddToGroupAsync(email, group);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok($"{email}:{group}")) : BadRequest(result);
         }
 
         [HttpDelete("{email}/groups/{group}")]
-        public async Task<ActionResult<Result<string, string[]>>> RemoveFromGroup(string email, string group)
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<string, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<string, Error>>> RemoveFromGroup(string email, string group)
         {
-            await service.RemoveFromGroupAsync(email, group);
-            return Ok(Result<string, string[]>.Ok($"{email}:{group}"));
+            var result = await service.RemoveFromGroupAsync(email, group);
+            return result.IsSuccess ? Ok(Result<string, Error>.Ok($"{email}:{group}")) : BadRequest(result);
         }
 
         [HttpGet("{email}/groups")]
-        public async Task<ActionResult<Result<IEnumerable<string>, string[]>>> GetGroups(string email)
+        [ProducesResponseType(typeof(Result<IEnumerable<string>, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<IEnumerable<string>, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<IEnumerable<string>, Error>>> GetGroups(string email)
         {
-            var groups = await service.GetUserGroupsAsync(email);
-            return Ok(Result<IEnumerable<string>, string[]>.Ok(groups));
+            var result = await service.GetUserGroupsAsync(email);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
 
         [HttpGet("{email}")]
-        public async Task<ActionResult<Result<UserResponse, string[]>>> GetByEmail(string email)
+        [ProducesResponseType(typeof(Result<UserResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<UserResponse, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<UserResponse, Error>>> GetByEmail(string email)
         {
-            var user = await service.GetUserAsync(email);
-            return Ok(Result<UserResponse, string[]>.Ok(user));
+            var result = await service.GetUserAsync(email);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
         }
 
         [HttpGet]
-        public async Task<ActionResult<Result<IEnumerable<UserResponse>, string[]>>> List()
+        [ProducesResponseType(typeof(Result<IEnumerable<UserResponse>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<UserResponse>, Error>>> List()
         {
-            var users = await service.ListUsersAsync();
-            return Ok(Result<IEnumerable<UserResponse>, string[]>.Ok(users));
+            var result = await service.ListUsersAsync();
+            return Ok(result);
         }
 
         [HttpGet("groups")]
-        public async Task<ActionResult<Result<IEnumerable<string>, string[]>>> ListGroups()
+        [ProducesResponseType(typeof(Result<IEnumerable<string>, Error>), StatusCodes.Status200OK)]
+        public async Task<ActionResult<Result<IEnumerable<string>, Error>>> ListGroups()
         {
-            var groups = await service.ListGroupsAsync();
-            return Ok(Result<IEnumerable<string>, string[]>.Ok(groups));
+            var result = await service.ListGroupsAsync();
+            return Ok(result);
         }
     }
 }

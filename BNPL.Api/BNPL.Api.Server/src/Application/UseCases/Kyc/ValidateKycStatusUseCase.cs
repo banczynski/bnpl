@@ -1,4 +1,4 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
+﻿using Core.Persistence.Interfaces;
 using BNPL.Api.Server.src.Application.Abstractions.Repositories;
 using Core.Context.Extensions;
 using Core.Context.Interfaces;
@@ -6,44 +6,28 @@ using Core.Models;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
+    public sealed record ValidateKycStatusRequestUseCase(Guid CustomerId);
+
     public sealed class ValidateKycStatusUseCase(
         IKycRepository kycRepository,
         IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<ValidateKycStatusRequestUseCase, Result<bool, Error>>
     {
-        public async Task<Result<string, string[]>> ExecuteAsync(Guid customerId)
+        public async Task<Result<bool, Error>> ExecuteAsync(ValidateKycStatusRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var entity = await kycRepository.GetByCustomerIdAsync(request.CustomerId, unitOfWork.Transaction);
+            if (entity is null)
+                return Result<bool, Error>.Fail(DomainErrors.Kyc.NotFound);
 
-            try
+            if (entity.OcrValidated && entity.FaceMatchValidated)
             {
-                scope.Begin();
-
-                var entity = await kycRepository.GetByCustomerIdAsync(customerId, scope.Transaction);
-                if (entity is null)
-                    return Result<string, string[]>.Fail(["KYC data not found."]);
-
-                if (entity.OcrValidated && entity.FaceMatchValidated)
-                {
-                    entity.MarkAsValidated(DateTime.UtcNow, userContext.GetRequiredUserId());
-                    await kycRepository.UpdateAsync(entity, scope.Transaction);
-
-                    scope.Commit();
-                    return Result<string, string[]>.Ok("KYC status set to Validated.");
-                }
-
-                return Result<string, string[]>.Fail([
-                    $"KYC not fully validated.",
-                    $"OCR: {entity.OcrValidated}",
-                    $"FaceMatch: {entity.FaceMatchValidated}"
-                ]);
+                entity.MarkAsValidated(DateTime.UtcNow, userContext.GetRequiredUserId());
+                await kycRepository.UpdateAsync(entity, unitOfWork.Transaction);
+                return Result<bool, Error>.Ok(true);
             }
-            catch
-            {
-                scope.Rollback();
-                throw;
-            }
+
+            return Result<bool, Error>.Fail(DomainErrors.Kyc.NotFullyValidated);
         }
     }
 }

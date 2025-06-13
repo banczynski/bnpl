@@ -11,12 +11,11 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
         IFinancialChargesConfigurationService configService
     )
     {
-        public async Task<Result<InstallmentChargesResult, string>> ExecuteAsync(Guid installmentId, DateTime? paymentDate = null)
+        public async Task<Result<InstallmentChargesResult, Error>> ExecuteAsync(Guid installmentId, DateTime? paymentDate = null)
         {
             var entity = await installmentRepository.GetByIdAsync(installmentId);
-
             if (entity is null)
-                return Result<InstallmentChargesResult, string>.Fail("Installment not found.");
+                return Result<InstallmentChargesResult, Error>.Fail(DomainErrors.Installment.NotFound);
 
             var config = await configService.GetEffectiveConfigAsync(entity.PartnerId, entity.AffiliateId);
 
@@ -30,7 +29,7 @@ namespace BNPL.Api.Server.src.Application.UseCases.Installment
 
             var result = chargesCalculator.Calculate(input);
 
-            return Result<InstallmentChargesResult, string>.Ok(result);
+            return Result<InstallmentChargesResult, Error>.Ok(result);
         }
     }
 }

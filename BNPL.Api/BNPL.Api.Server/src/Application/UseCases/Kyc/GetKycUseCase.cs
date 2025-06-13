@@ -7,14 +7,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.Kyc
 {
     public sealed class GetKycUseCase(IKycRepository kycRepository)
     {
-        public async Task<Result<KycDto, string>> ExecuteAsync(Guid customerId)
+        public async Task<Result<KycDto, Error>> ExecuteAsync(Guid customerId)
         {
             var entity = await kycRepository.GetByCustomerIdAsync(customerId);
 
             if (entity is null)
-                return Result<KycDto, string>.Fail("KYC data not found.");
+                return Result<KycDto, Error>.Fail(DomainErrors.Kyc.NotFound);
 
-            return Result<KycDto, string>.Ok(entity.ToDto());
+            return Result<KycDto, Error>.Ok(entity.ToDto());
         }
     }
 }

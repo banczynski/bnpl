@@ -7,14 +7,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.CreditLimit
 {
     public sealed class GetCustomerCreditLimitUseCase(ICustomerCreditLimitRepository customerCreditLimitRepository)
     {
-        public async Task<Result<CustomerCreditLimitDto, string>> ExecuteAsync(string taxId, Guid affiliateId)
+        public async Task<Result<CustomerCreditLimitDto, Error>> ExecuteAsync(string taxId, Guid affiliateId)
         {
             var entity = await customerCreditLimitRepository.GetByTaxIdAndAffiliateIdAsync(taxId, affiliateId);
 
             if (entity is null)
-                return Result<CustomerCreditLimitDto, string>.Fail("Customer credit limit not found.");
+                return Result<CustomerCreditLimitDto, Error>.Fail(DomainErrors.CreditLimit.NotFound);
 
-            return Result<CustomerCreditLimitDto, string>.Ok(entity.ToDto());
+            return Result<CustomerCreditLimitDto, Error>.Ok(entity.ToDto());
         }
     }
 }

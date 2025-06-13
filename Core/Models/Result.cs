@@ -1,6 +1,8 @@
-﻿namespace Core.Models
+﻿using Core.Models.Interfaces;
+
+namespace Core.Models
 {
-    public abstract record Result<TSuccess, TError>
+    public abstract record Result<TSuccess, TError> : IResult
     {
         public sealed record Success(TSuccess Value) : Result<TSuccess, TError>;
         public sealed record Failure(TError Error) : Result<TSuccess, TError>;
@@ -18,7 +20,6 @@
                 value = s.Value;
                 return true;
             }
-
             value = default!;
             return false;
         }
@@ -30,7 +31,6 @@
                 error = f.Error;
                 return true;
             }
-
             error = default!;
             return false;
         }

@@ -7,13 +7,13 @@ namespace BNPL.Api.Server.src.Application.UseCases.Proposal
 {
     public sealed class GetProposalsByCustomerIdUseCase(IProposalRepository proposalRepository)
     {
-        public async Task<Result<IEnumerable<ProposalDto>, string>> ExecuteAsync(Guid customerId, bool onlyActive = true)
+        public async Task<Result<IEnumerable<ProposalDto>, Error>> ExecuteAsync(Guid customerId)
         {
-            var items = await proposalRepository.GetListByCustomerIdAsync(customerId, onlyActive);
+            var items = await proposalRepository.GetActivesByAffiliateIdAsync(customerId);
 
             return items is null || !items.Any()
-                ? Result<IEnumerable<ProposalDto>, string>.Fail("No proposals found for the given customer.")
-                : Result<IEnumerable<ProposalDto>, string>.Ok(items.ToDtoList());
+                ? Result<IEnumerable<ProposalDto>, Error>.Fail(DomainErrors.Proposal.NotFoundForCriteria)
+                : Result<IEnumerable<ProposalDto>, Error>.Ok(items.ToDtoList());
         }
     }
 }

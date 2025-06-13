@@ -5,45 +5,10 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
 {
-    public sealed class ProposalItemRepository(IDbConnection connection) : IProposalItemRepository
+    public sealed class ProposalItemRepository(IDbConnection connection) : GenericRepository<ProposalItem>(connection), IProposalItemRepository
     {
-        public async Task InsertAsync(ProposalItem proposalItem, IDbTransaction? transaction = null)
-        {
-            await connection.InsertAsync(proposalItem, transaction);
-        }
-
-        public async Task InsertManyAsync(IEnumerable<ProposalItem> items, IDbTransaction? transaction = null)
-        {
-            foreach (var item in items)
-                await connection.InsertAsync(item, transaction);
-        }
-
-        public async Task UpdateManyAsync(IEnumerable<ProposalItem> items, IDbTransaction? transaction = null)
-        {
-            foreach (var item in items)
-                await connection.UpdateAsync(item, transaction);
-        }
-
-        public async Task<IEnumerable<ProposalItem>> GetByProposalIdAsync(Guid proposalId, IDbTransaction? transaction = null)
-        {
-            const string sql = "SELECT * FROM proposal_item WHERE proposal_id = @ProposalId";
-            return await connection.QueryAsync<ProposalItem>(sql, new { ProposalId = proposalId }, transaction);
-        }
-
-        public async Task<ProposalItem?> GetByIdAsync(Guid proposalItemId, IDbTransaction? transaction = null)
-        {
-            const string sql = "SELECT * FROM proposal_item WHERE code = @ProposalItemId LIMIT 1";
-            return await connection.QueryFirstOrDefaultAsync<ProposalItem>(sql, new { ProposalItemId = proposalItemId }, transaction);
-        }
-
-        public async Task UpdateAsync(ProposalItem item, IDbTransaction? transaction = null)
-        {
-            await connection.UpdateAsync(item, transaction);
-        }
-
-        public async Task MarkAllItemsAsReturnedByProposalIdAsync(Guid proposalId, string reason, IDbTransaction? transaction = null)
-        {
-            const string sql = """
+        private const string GetByProposalIdSql = "SELECT * FROM proposal_item WHERE proposal_id = @ProposalId";
+        private const string MarkAllAsReturnedSql = """
             UPDATE proposal_item
             SET returned = true,
                 return_reason = @Reason,
@@ -51,11 +16,30 @@ namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
             WHERE proposal_id = @ProposalId 
             """;
 
-            await connection.ExecuteAsync(sql, new
+        public async Task InsertManyAsync(IEnumerable<ProposalItem> items, IDbTransaction? transaction = null)
+        {
+            foreach (var item in items)
             {
-                ProposalId = proposalId,
-                Reason = reason
-            }, transaction);
+                await base.InsertAsync(item, transaction);
+            }
+        }
+
+        public async Task UpdateManyAsync(IEnumerable<ProposalItem> items, IDbTransaction? transaction = null)
+        {
+            foreach (var item in items)
+            {
+                await base.UpdateAsync(item, transaction);
+            }
+        }
+
+        public async Task<IEnumerable<ProposalItem>> GetByProposalIdAsync(Guid proposalId, IDbTransaction? transaction = null)
+        {
+            return await Connection.QueryAsync<ProposalItem>(GetByProposalIdSql, new { ProposalId = proposalId }, transaction);
+        }
+
+        public async Task MarkAllItemsAsReturnedByProposalIdAsync(Guid proposalId, string reason, IDbTransaction? transaction = null)
+        {
+            await Connection.ExecuteAsync(MarkAllAsReturnedSql, new { ProposalId = proposalId, Reason = reason }, transaction);
         }
     }
 }

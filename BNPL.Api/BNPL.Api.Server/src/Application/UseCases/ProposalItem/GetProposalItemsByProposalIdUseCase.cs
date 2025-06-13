@@ -9,10 +9,10 @@ namespace BNPL.Api.Server.src.Application.UseCases.ProposalItem
         IProposalItemRepository proposalItemRepository
     )
     {
-        public async Task<Result<IEnumerable<ProposalItemDto>, string>> ExecuteAsync(Guid proposalId)
+        public async Task<Result<IEnumerable<ProposalItemDto>, Error>> ExecuteAsync(Guid proposalId)
         {
             var items = await proposalItemRepository.GetByProposalIdAsync(proposalId);
-            return Result<IEnumerable<ProposalItemDto>, string>.Ok(items.ToDtoList());
+            return Result<IEnumerable<ProposalItemDto>, Error>.Ok(items.ToDtoList());
         }
     }
 }

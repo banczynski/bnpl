@@ -1,38 +1,31 @@
-﻿using BNPL.Api.Server.src.Application.Abstractions.Persistence;
-using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
+﻿using BNPL.Api.Server.src.Application.DTOs.CreditAnalysis;
 using Core.Models;
+using Core.Persistence.Interfaces;
 
 namespace BNPL.Api.Server.src.Application.UseCases.CreditAnalysis
 {
+    public sealed record RunCreditAnalysisRequestUseCase(Guid PartnerId, Guid AffiliateId, string CustomerTaxId);
+
     public sealed class RunCreditAnalysisUseCase(
         EvaluateCustomerCreditUseCase evaluateCustomerCreditUseCase,
         IUnitOfWork unitOfWork
-    )
+    ) : IUseCase<RunCreditAnalysisRequestUseCase, Result<CreditAnalysisResult, Error>>
     {
-        public async Task<Result<CreditAnalysisResult, string>> ExecuteAsync(Guid partnerId, Guid affiliateId, string customerTaxId)
+        public async Task<Result<CreditAnalysisResult, Error>> ExecuteAsync(RunCreditAnalysisRequestUseCase request)
         {
-            using var scope = unitOfWork;
+            var result = await evaluateCustomerCreditUseCase.ExecuteAsync(
+                request.PartnerId,
+                request.AffiliateId,
+                request.CustomerTaxId,
+                unitOfWork.Transaction);
 
-            try
-            {
-                scope.Begin();
+            if (result.TryGetError(out var error))
+                return Result<CreditAnalysisResult, Error>.Fail(error!);
 
-                var result = await evaluateCustomerCreditUseCase.ExecuteAsync(partnerId, affiliateId, customerTaxId, scope.Transaction);
+            if (result.TryGetSuccess(out var successValue))
+                return Result<CreditAnalysisResult, Error>.Ok(successValue);
 
-                if (result is Result<CreditAnalysisResult, string>.Failure fail)
-                    return Result<CreditAnalysisResult, string>.Fail(fail.Error);
-
-                if (result is not Result<CreditAnalysisResult, string>.Success success)
-                    return Result<CreditAnalysisResult, string>.Fail("Unexpected result state");
-
-                scope.Commit();
-                return Result<CreditAnalysisResult, string>.Ok(success.Value);
-            }
-            catch
-            {
-                scope.Rollback();
-                throw;
-            }
+            return Result<CreditAnalysisResult, Error>.Fail(DomainErrors.General.Unexpected);
         }
     }
 }

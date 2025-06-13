@@ -12,32 +12,32 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     {
         [HttpPost("login")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<Result<LoginResponse, string>>> Login([FromBody] LoginRequest request)
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<LoginResponse, Error>>> Login([FromBody] LoginRequest request)
         {
             var result = await authService.AuthenticateAsync(request);
-            return Ok(result);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
 
         [HttpPost("refresh-token")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<Result<LoginResponse, string>>> RefreshToken([FromBody] RefreshTokenRequest request)
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<LoginResponse, Error>>> RefreshToken([FromBody] RefreshTokenRequest request)
         {
             var result = await authService.RefreshTokenAsync(request);
-            return Ok(result);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
 
         [HttpPost("complete-challenge")]
         [AllowAnonymous]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status200OK)]
-        [ProducesResponseType(typeof(Result<LoginResponse, string>), StatusCodes.Status400BadRequest)]
-        public async Task<ActionResult<Result<LoginResponse, string>>> CompleteChallenge([FromBody] CompleteChallengeRequest request)
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<LoginResponse, Error>), StatusCodes.Status400BadRequest)]
+        public async Task<ActionResult<Result<LoginResponse, Error>>> CompleteChallenge([FromBody] CompleteChallengeRequest request)
         {
             var result = await authService.CompleteNewPasswordChallengeAsync(request);
-            return Ok(result);
+            return result.IsSuccess ? Ok(result) : BadRequest(result);
         }
     }
 }

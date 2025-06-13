@@ -5,65 +5,45 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
 {
-    public sealed class CustomerRepository(IDbConnection connection) : ICustomerRepository
+    public sealed class CustomerRepository : GenericRepository<Customer>, ICustomerRepository
     {
-        public IDbConnection Connection => connection;
+        private const string GetIdByTaxIdSql = "SELECT code FROM customer WHERE tax_id = @TaxId LIMIT 1";
+        private const string GetByTaxIdSql = "SELECT * FROM customer WHERE tax_id = @TaxId";
+        private const string GetActivesByAffiliateIdSql = "SELECT * FROM customer WHERE affiliate_id = @AffiliateId AND is_active = TRUE";
+        private const string GetAllByAffiliateIdSql = "SELECT * FROM customer WHERE affiliate_id = @AffiliateId";
+        private const string GetActivesByPartnerIdSql = "SELECT * FROM customer WHERE partner_id = @PartnerId AND is_active = TRUE";
+        private const string GetAllByPartnerIdSql = "SELECT * FROM customer WHERE partner_id = @PartnerId";
 
-        public async Task InsertAsync(Customer customer, IDbTransaction? transaction = null)
-            => await connection.InsertAsync(customer, transaction);
-
-        public async Task UpdateAsync(Customer customer, IDbTransaction? transaction = null)
-            => await connection.UpdateAsync(customer, transaction);
-
-        public async Task InactivateAsync(Guid id, Guid updatedBy, DateTime updatedAt, IDbTransaction? transaction = null)
-        {
-            const string sql = """
-            UPDATE customer
-            SET is_active = FALSE,
-                updated_by = @UpdatedBy,
-                updated_at = @UpdatedAt
-            WHERE code = @Id
-            """;
-
-            await connection.ExecuteAsync(sql, new { Id = id, UpdatedBy = updatedBy, UpdatedAt = updatedAt }, transaction);
-        }
-
-        public async Task<Customer?> GetByIdAsync(Guid id, IDbTransaction? transaction = null)
-        {
-            const string sql = "SELECT * FROM customer WHERE code = @Id LIMIT 1";
-            return await connection.QuerySingleOrDefaultAsync<Customer>(sql, new { Id = id }, transaction);
-        }
+        public CustomerRepository(IDbConnection connection) : base(connection) { }
 
         public async Task<Guid?> GetIdByTaxIdAsync(string taxId, IDbTransaction? transaction = null)
         {
-            const string sql = "SELECT code FROM customer WHERE tax_id = @TaxId LIMIT 1";
-            return await connection.ExecuteScalarAsync<Guid>(sql, new { TaxId = taxId }, transaction);
+            return await Connection.QuerySingleOrDefaultAsync<Guid?>(GetIdByTaxIdSql, new { TaxId = taxId }, transaction);
         }
 
-        public async Task<IEnumerable<Customer?>> GetByTaxIdAsync(string taxId, IDbTransaction? transaction = null)
+        public async Task<IEnumerable<Customer>> GetByTaxIdAsync(string taxId, IDbTransaction? transaction = null)
         {
-            const string sql = "SELECT * FROM customer WHERE tax_id = @TaxId";
-            return await connection.QueryAsync<Customer>(sql, new { TaxId = taxId }, transaction);
+            return await Connection.QueryAsync<Customer>(GetByTaxIdSql, new { TaxId = taxId }, transaction);
         }
 
-        public async Task<IEnumerable<Customer>> GetByAffiliateIdAsync(Guid affiliateId, bool onlyActive = true, IDbTransaction? transaction = null)
+        public async Task<IEnumerable<Customer>> GetActivesByAffiliateIdAsync(Guid affiliateId, IDbTransaction? transaction = null)
         {
-            var sql = """
-            SELECT * FROM customer
-            WHERE affiliate_id = @AffiliateId
-            """ + (onlyActive ? " AND is_active = TRUE" : "");
-
-            return await connection.QueryAsync<Customer>(sql, new { AffiliateId = affiliateId }, transaction);
+            return await Connection.QueryAsync<Customer>(GetActivesByAffiliateIdSql, new { AffiliateId = affiliateId }, transaction);
         }
 
-        public async Task<IEnumerable<Customer>> GetByPartnerIdAsync(Guid partnerId, bool onlyActive = true, IDbTransaction? transaction = null)
+        public async Task<IEnumerable<Customer>> GetAllByAffiliateIdAsync(Guid affiliateId, IDbTransaction? transaction = null)
         {
-            var sql = """
-            SELECT * FROM customer
-            WHERE partner_id = @PartnerId
-            """ + (onlyActive ? " AND is_active = TRUE" : "");
+            return await Connection.QueryAsync<Customer>(GetAllByAffiliateIdSql, new { AffiliateId = affiliateId }, transaction);
+        }
 
-            return await connection.QueryAsync<Customer>(sql, new { PartnerId = partnerId }, transaction);
+        public async Task<IEnumerable<Customer>> GetActivesByPartnerIdAsync(Guid partnerId, IDbTransaction? transaction = null)
+        {
+            return await Connection.QueryAsync<Customer>(GetActivesByPartnerIdSql, new { PartnerId = partnerId }, transaction);
+        }
+
+        public async Task<IEnumerable<Customer>> GetAllByPartnerIdAsync(Guid partnerId, IDbTransaction? transaction = null)
+        {
+            return await Connection.QueryAsync<Customer>(GetAllByPartnerIdSql, new { PartnerId = partnerId }, transaction);
         }
     }
 }

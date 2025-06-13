@@ -7,13 +7,13 @@ namespace BNPL.Api.Server.src.Application.UseCases.Simulation
 {
     public sealed class GetSimulationByIdUseCase(ISimulationRepository simulationRepository)
     {
-        public async Task<Result<SimulationDto, string>> ExecuteAsync(Guid id)
+        public async Task<Result<SimulationDto, Error>> ExecuteAsync(Guid id)
         {
             var simulation = await simulationRepository.GetByIdAsync(id);
             if (simulation is null)
-                return Result<SimulationDto, string>.Fail("Simulation not found.");
+                return Result<SimulationDto, Error>.Fail(DomainErrors.Simulation.NotFound);
 
-            return Result<SimulationDto, string>.Ok(simulation.ToDto());
+            return Result<SimulationDto, Error>.Ok(simulation.ToDto());
         }
     }
 }

@@ -1,31 +1,32 @@
-﻿using Core.Context.Interfaces;
-using BNPL.Api.Server.src.Application.DTOs.Affiliate;
+﻿using BNPL.Api.Server.src.Application.DTOs.Affiliate;
 using BNPL.Api.Server.src.Application.Mappers;
 using Core.Context.Extensions;
+using Core.Context.Interfaces;
 using Core.Models;
-using BNPL.Api.Server.src.Application.Abstractions.Repositories;
+using Core.Persistence.Interfaces;
 
 namespace BNPL.Api.Server.src.Application.UseCases.Affiliate
 {
+    public sealed record UpdateAffiliateRequestUseCase(Guid AffiliateId, UpdateAffiliateRequest Dto);
+
     public sealed class UpdateAffiliateUseCase(
         IAffiliateRepository affiliateRepository,
+        IUnitOfWork unitOfWork,
         IUserContext userContext
-    )
+    ) : IUseCase<UpdateAffiliateRequestUseCase, Result<AffiliateDto, Error>>
     {
-        public async Task<Result<AffiliateDto, string>> ExecuteAsync(Guid affiliateId, UpdateAffiliateRequest request)
+        public async Task<Result<AffiliateDto, Error>> ExecuteAsync(UpdateAffiliateRequestUseCase request)
         {
-            var entity = await affiliateRepository.GetByIdAsync(affiliateId);
-
+            var entity = await affiliateRepository.GetByIdAsync(request.AffiliateId, unitOfWork.Transaction);
             if (entity is null)
-                return Result<AffiliateDto, string>.Fail("Affiliate not found.");
+                return Result<AffiliateDto, Error>.Fail(DomainErrors.Affiliate.NotFound);
 
             var now = DateTime.UtcNow;
+            entity.UpdateEntity(request.Dto, now, userContext.GetRequiredUserId());
 
-            entity.UpdateEntity(request, now, userContext.GetRequiredUserId());
+            await affiliateRepository.UpdateAsync(entity, unitOfWork.Transaction);
 
-            await affiliateRepository.UpdateAsync(entity);
-
-            return Result<AffiliateDto, string>.Ok(entity.ToDto());
+            return Result<AffiliateDto, Error>.Ok(entity.ToDto());
         }
     }
 }

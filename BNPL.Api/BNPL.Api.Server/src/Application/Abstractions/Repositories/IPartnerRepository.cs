@@ -3,12 +3,9 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Application.Abstractions.Repositories
 {
-    public interface IPartnerRepository
+    public interface IPartnerRepository : IGenericRepository<Partner>
     {
-        Task InsertAsync(Partner partner, IDbTransaction? transaction = null);
-        Task UpdateAsync(Partner partner, IDbTransaction? transaction = null);
-        Task InactivateAsync(Guid id, Guid updatedBy, DateTime updatedAt, IDbTransaction? transaction = null);
-        Task<Partner?> GetByIdAsync(Guid id, IDbTransaction? transaction = null);
-        Task<IEnumerable<Partner>> GetAllAsync(bool onlyActive = true, IDbTransaction? transaction = null);
+        Task<IEnumerable<Partner>> GetAllAsync(IDbTransaction? transaction = null);
+        Task<IEnumerable<Partner>> GetActivesAsync(IDbTransaction? transaction = null);
     }
 }

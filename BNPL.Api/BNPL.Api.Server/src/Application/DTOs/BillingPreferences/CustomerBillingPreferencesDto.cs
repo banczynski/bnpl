@@ -1,4 +1,4 @@
-﻿namespace BNPL.Api.Server.src.Application.UseCases.BillingPreferences
+﻿namespace BNPL.Api.Server.src.Application.DTOs.BillingPreferences
 {
     public sealed record CustomerBillingPreferencesDto(
         Guid Code,

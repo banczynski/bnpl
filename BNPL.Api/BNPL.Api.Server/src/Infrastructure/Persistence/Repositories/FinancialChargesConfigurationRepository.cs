@@ -5,64 +5,47 @@ using System.Data;
 
 namespace BNPL.Api.Server.src.Infrastructure.Persistence.Repositories
 {
-    public sealed class FinancialChargesConfigurationRepository(IDbConnection connection) : IFinancialChargesConfigurationRepository
+    public sealed class FinancialChargesConfigurationRepository(IDbConnection connection) : GenericRepository<FinancialChargesConfiguration>(connection), IFinancialChargesConfigurationRepository
     {
-        public async Task InsertAsync(FinancialChargesConfiguration config, IDbTransaction? transaction = null)
-            => await connection.InsertAsync(config, transaction);
+        private const string InactivateByPartnerOrAffiliateSql = """
+        UPDATE financial_charges_configuration
+        SET is_active = FALSE,
+            updated_by = @UpdatedBy,
+            updated_at = @UpdatedAt
+        WHERE partner_id = @PartnerId
+          AND (@AffiliateId IS NULL AND affiliate_id IS NULL OR affiliate_id = @AffiliateId)
+        """;
 
-        public async Task UpdateAsync(FinancialChargesConfiguration config, IDbTransaction? transaction = null)
-            => await connection.UpdateAsync(config, transaction);
+        private const string GetByAffiliateSql = "SELECT * FROM financial_charges_configuration WHERE affiliate_id = @AffiliateId LIMIT 1";
+        private const string GetByPartnerSql = "SELECT * FROM financial_charges_configuration WHERE partner_id = @PartnerId AND affiliate_id IS NULL LIMIT 1";
+        private const string GetAllByPartnerSql = "SELECT * FROM financial_charges_configuration WHERE partner_id = @PartnerId AND is_active = TRUE";
 
-        public async Task InactivateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, DateTime updatedAt, IDbTransaction? transaction = null)
+        public async Task<bool> InactivateByPartnerOrAffiliateAsync(Guid partnerId, Guid? affiliateId, Guid updatedBy, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            UPDATE financial_charges_configuration
-            SET is_active = FALSE,
-                updated_by = @UpdatedBy,
-                updated_at = @UpdatedAt
-            WHERE partner_id = @PartnerId
-            AND (@AffiliateId IS NULL OR affiliate_id = @AffiliateId)
-            """;
-
-            await connection.ExecuteAsync(sql, new
+            var affectedRows = await Connection.ExecuteAsync(InactivateByPartnerOrAffiliateSql, new
             {
                 PartnerId = partnerId,
                 AffiliateId = affiliateId,
                 UpdatedBy = updatedBy,
-                UpdatedAt = updatedAt
+                UpdatedAt = DateTime.UtcNow
             }, transaction);
+
+            return affectedRows > 0;
         }
 
         public async Task<FinancialChargesConfiguration?> GetByAffiliateAsync(Guid affiliateId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM financial_charges_configuration
-            WHERE affiliate_id = @AffiliateId
-            LIMIT 1
-            """;
-
-            return await connection.QueryFirstOrDefaultAsync<FinancialChargesConfiguration>(sql, new { AffiliateId = affiliateId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<FinancialChargesConfiguration>(GetByAffiliateSql, new { AffiliateId = affiliateId }, transaction);
         }
 
         public async Task<FinancialChargesConfiguration?> GetByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM financial_charges_configuration
-            WHERE partner_id = @PartnerId AND affiliate_id IS NULL
-            LIMIT 1
-            """;
-
-            return await connection.QueryFirstOrDefaultAsync<FinancialChargesConfiguration>(sql, new { PartnerId = partnerId }, transaction);
+            return await Connection.QueryFirstOrDefaultAsync<FinancialChargesConfiguration>(GetByPartnerSql, new { PartnerId = partnerId }, transaction);
         }
 
         public async Task<IEnumerable<FinancialChargesConfiguration>> GetAllByPartnerAsync(Guid partnerId, IDbTransaction? transaction = null)
         {
-            const string sql = """
-            SELECT * FROM financial_charges_configuration
-            WHERE partner_id = @PartnerId AND is_active = TRUE
-            """;
-
-            return await connection.QueryAsync<FinancialChargesConfiguration>(sql, new { PartnerId = partnerId }, transaction);
+            return await Connection.QueryAsync<FinancialChargesConfiguration>(GetAllByPartnerSql, new { PartnerId = partnerId }, transaction);
         }
     }
 }

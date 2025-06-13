@@ -7,14 +7,14 @@ namespace BNPL.Api.Server.src.Application.UseCases.Partner
 {
     public sealed class GetPartnerByIdUseCase(IPartnerRepository partnerRepository)
     {
-        public async Task<Result<PartnerDto, string>> ExecuteAsync(Guid id)
+        public async Task<Result<PartnerDto, Error>> ExecuteAsync(Guid id)
         {
             var entity = await partnerRepository.GetByIdAsync(id);
 
             if (entity is null)
-                return Result<PartnerDto, string>.Fail("Partner not found.");
+                return Result<PartnerDto, Error>.Fail(DomainErrors.Partner.NotFound);
 
-            return Result<PartnerDto, string>.Ok(entity.ToDto());
+            return Result<PartnerDto, Error>.Ok(entity.ToDto());
         }
     }
 }

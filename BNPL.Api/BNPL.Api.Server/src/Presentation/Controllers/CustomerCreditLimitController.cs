@@ -14,9 +14,14 @@ namespace BNPL.Api.Server.src.Presentation.Controllers
     ) : ControllerBase
     {
         [HttpGet("{taxId}")]
-        public async Task<ActionResult<Result<CustomerCreditLimitDto, string>>> Get(
+        [ProducesResponseType(typeof(Result<CustomerCreditLimitDto, Error>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(Result<CustomerCreditLimitDto, Error>), StatusCodes.Status404NotFound)]
+        public async Task<ActionResult<Result<CustomerCreditLimitDto, Error>>> Get(
             string taxId,
             [FromQuery] Guid affiliateId)
-            => Ok(await getUseCase.ExecuteAsync(taxId, affiliateId));
+        {
+            var result = await getUseCase.ExecuteAsync(taxId, affiliateId);
+            return result.IsSuccess ? Ok(result) : NotFound(result);
+        }
     }
 }
